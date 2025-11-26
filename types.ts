@@ -111,8 +111,11 @@ export interface LevelConfig {
   colors: {
     sky: [string, string];
     ground: string;
+    mountains: string;
+    city: string;
     fog: string;
     grid: string; 
+    aurora: [string, string]; // Top/Bottom colors
   };
   obstacleSpeed: number;
   spawnRate: number;
@@ -121,11 +124,18 @@ export interface LevelConfig {
   glitchIntensity: number; // 0 to 1
 }
 
+export interface BackgroundPoint {
+    height: number;
+    isBuilding: boolean;
+    hasWindows: boolean;
+}
+
 export interface BackgroundLayer {
-  points: {height: number, type: number}[];
+  points: BackgroundPoint[];
   color: string;
   speedModifier: number;
   offset: number;
+  type: 'MOUNTAINS' | 'CITY' | 'HILLS';
 }
 
 export interface DialogueLine {

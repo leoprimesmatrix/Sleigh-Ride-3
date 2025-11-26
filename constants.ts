@@ -1,3 +1,4 @@
+
 import { LevelConfig, PowerupType, DialogueLine } from './types.ts';
 
 export const CANVAS_WIDTH = 1200;
@@ -33,8 +34,11 @@ export const LEVELS: LevelConfig[] = [
     colors: { 
       sky: ['#0f172a', '#1e293b'], // Deep starry blue
       ground: '#f8fafc', // Pristine Snow
-      fog: 'rgba(255, 255, 255, 0.15)', 
-      grid: '#334155' // Slate
+      mountains: '#334155', // Slate Mountains
+      city: '#475569', // Darker city silhouette
+      fog: 'rgba(255, 255, 255, 0.05)', 
+      grid: '#334155',
+      aurora: ['#2dd4bf', '#0f766e'] // Teal/Green
     },
     obstacleSpeed: 1.0,
     spawnRate: 1.0,
@@ -48,8 +52,11 @@ export const LEVELS: LevelConfig[] = [
     colors: { 
       sky: ['#1e1b4b', '#312e81'], // Indigo Night
       ground: '#e0f2fe', // Icy Blue
-      fog: 'rgba(200, 230, 255, 0.2)',
-      grid: '#4f46e5' // Indigo
+      mountains: '#4338ca', // Indigo Mountains
+      city: '#3730a3', // Dark Indigo
+      fog: 'rgba(200, 230, 255, 0.1)',
+      grid: '#4f46e5',
+      aurora: ['#818cf8', '#4338ca'] // Purple/Indigo
     },
     obstacleSpeed: 1.1,
     spawnRate: 1.2,
@@ -62,9 +69,12 @@ export const LEVELS: LevelConfig[] = [
     subtext: "TIME IS SKIPPING BEATS",
     colors: { 
       sky: ['#111827', '#374151'], // Storm Dark
-      ground: '#94a3b8', // Gray Snow
-      fog: 'rgba(255, 255, 255, 0.4)',
-      grid: '#fbbf24' // Warning Gold
+      ground: '#cbd5e1', // Gray Snow
+      mountains: '#1f2937', // Dark Gray
+      city: '#374151', // Gray City
+      fog: 'rgba(255, 255, 255, 0.2)',
+      grid: '#fbbf24',
+      aurora: ['#fbbf24', '#b45309'] // Warning Gold
     },
     obstacleSpeed: 1.3,
     spawnRate: 1.4,
@@ -78,8 +88,11 @@ export const LEVELS: LevelConfig[] = [
     colors: { 
       sky: ['#0f0505', '#2b0a0a'], // Deep Void Red
       ground: '#450a0a', 
-      fog: 'rgba(153, 27, 27, 0.2)',
-      grid: '#ef4444' // Error Red
+      mountains: '#2a0a0a',
+      city: '#1a0505',
+      fog: 'rgba(153, 27, 27, 0.1)',
+      grid: '#ef4444',
+      aurora: ['#ef4444', '#7f1d1d'] // Error Red
     },
     obstacleSpeed: 1.5,
     spawnRate: 1.8,
@@ -93,8 +106,11 @@ export const LEVELS: LevelConfig[] = [
     colors: { 
       sky: ['#000000', '#020617'], // Absolute Void
       ground: '#000000', 
-      fog: 'rgba(6, 182, 212, 0.1)',
-      grid: '#06b6d4' // Cyan Tech
+      mountains: '#000000',
+      city: '#020617',
+      fog: 'rgba(6, 182, 212, 0.05)',
+      grid: '#06b6d4',
+      aurora: ['#06b6d4', '#0891b2'] // Digital Cyan
     },
     obstacleSpeed: 0, 
     spawnRate: 0,

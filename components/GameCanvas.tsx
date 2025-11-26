@@ -1,6 +1,7 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { 
-  GameState, Player, Obstacle, Powerup, DataLog, Particle, ParticleType, PowerupType, Entity, BackgroundLayer, DialogueLine, GameMode, Landmark, DebugCommand, ScorePopup, ObstacleType
+  GameState, Player, Obstacle, Powerup, DataLog, Particle, ParticleType, PowerupType, Entity, BackgroundLayer, DialogueLine, GameMode, Landmark, DebugCommand, ScorePopup, ObstacleType, BackgroundPoint
 } from '../types.ts';
 import { 
   CANVAS_WIDTH, CANVAS_HEIGHT, GRAVITY, THRUST_POWER, MAX_FALL_SPEED, BASE_SPEED, 
@@ -39,9 +40,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   
   // Visuals
   const bgLayersRef = useRef<BackgroundLayer[]>([
-    { points: [], color: '#000000', speedModifier: 0.05, offset: 0 }, 
-    { points: [], color: '#000000', speedModifier: 0.2, offset: 0 },  
-    { points: [], color: '#000000', speedModifier: 0.5, offset: 0 },  
+    { points: [], color: '#000000', speedModifier: 0.1, offset: 0, type: 'MOUNTAINS' }, 
+    { points: [], color: '#000000', speedModifier: 0.3, offset: 0, type: 'CITY' },  
+    { points: [], color: '#000000', speedModifier: 0.8, offset: 0, type: 'HILLS' },  
   ]);
   const starsRef = useRef<{x:number, y:number, size:number, opacity:number}[]>([]);
   const snowRef = useRef<{x:number, y:number, r:number, speed:number, swing:number}[]>([]);
@@ -142,24 +143,61 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   useEffect(() => {
     if (gameState !== GameState.PLAYING && gameState !== GameState.INTRO) return;
 
-    const genLandscape = (count: number, minH: number, maxH: number) => {
-        const pts = [];
-        let y = (minH + maxH) / 2;
-        for (let i = 0; i < count; i++) {
-             y += (Math.random() - 0.5) * 40;
-             y = Math.max(minH, Math.min(maxH, y));
-             pts.push({ height: y, type: 0 });
+    // --- Background Generation ---
+    const generateBackgroundSegment = (type: 'MOUNTAINS' | 'CITY' | 'HILLS', count: number): BackgroundPoint[] => {
+        const points: BackgroundPoint[] = [];
+        let h = 0;
+        
+        if (type === 'MOUNTAINS') {
+            h = 200;
+            for(let i=0; i<count; i++) {
+                h += (Math.random() - 0.5) * 50;
+                h = Math.max(100, Math.min(350, h));
+                points.push({ height: h, isBuilding: false, hasWindows: false });
+            }
+        } else if (type === 'CITY') {
+            // City generation: blocks of heights
+            let currentHeight = 150;
+            let widthLeft = 0;
+            let isGap = false;
+            
+            for(let i=0; i<count; i++) {
+                if (widthLeft <= 0) {
+                    isGap = Math.random() > 0.7; // 30% chance of gap
+                    if (isGap) {
+                        currentHeight = 50; // Low ground
+                        widthLeft = Math.floor(Math.random() * 5) + 2;
+                    } else {
+                        currentHeight = 150 + Math.random() * 150; // Tall building
+                        widthLeft = Math.floor(Math.random() * 8) + 4;
+                    }
+                }
+                points.push({ 
+                    height: currentHeight, 
+                    isBuilding: !isGap, 
+                    hasWindows: !isGap && Math.random() > 0.1 
+                });
+                widthLeft--;
+            }
+        } else {
+            // Hills (Smooth)
+            h = 50;
+            for(let i=0; i<count; i++) {
+                h += (Math.random() - 0.5) * 15;
+                h = Math.max(20, Math.min(100, h));
+                points.push({ height: h, isBuilding: false, hasWindows: false });
+            }
         }
-        return pts;
+        return points;
     };
 
     if (bgLayersRef.current[0].points.length === 0) {
-        bgLayersRef.current[0].points = genLandscape(100, 150, 400);
-        bgLayersRef.current[1].points = genLandscape(100, 80, 200);
-        bgLayersRef.current[2].points = genLandscape(100, 40, 100);
+        bgLayersRef.current[0].points = generateBackgroundSegment('MOUNTAINS', 150);
+        bgLayersRef.current[1].points = generateBackgroundSegment('CITY', 150);
+        bgLayersRef.current[2].points = generateBackgroundSegment('HILLS', 150);
         
         snowRef.current = [];
-        for(let i=0; i<150; i++) {
+        for(let i=0; i<200; i++) {
             snowRef.current.push({
                 x: Math.random() * CANVAS_WIDTH,
                 y: Math.random() * CANVAS_HEIGHT,
@@ -170,7 +208,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         }
         
         starsRef.current = [];
-        for(let i=0; i<100; i++) {
+        for(let i=0; i<150; i++) {
             starsRef.current.push({
                 x: Math.random() * CANVAS_WIDTH,
                 y: Math.random() * CANVAS_HEIGHT,
@@ -400,18 +438,138 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
       if (now % 100 < 20) setHudState({ integrity: player.integrity, stability: player.stability, isTimeSlipping: player.isTimeSlipping, progress: progressPercent, timeLeft: timeRef.current, levelIndex, score: scoreRef.current, activeDialogue: activeDialogueRef.current, activeLog: activeLogRef.current, combo: player.combo });
     };
 
-    const drawGrid = (ctx: CanvasRenderingContext2D, color: string, speed: number) => {
+    // --- Drawing Functions ---
+
+    const drawAurora = (ctx: CanvasRenderingContext2D, colors: [string, string], intensity: number, time: number) => {
+        ctx.save();
+        ctx.globalAlpha = 0.6 * (1 - intensity * 0.5); // Fades a bit if glitchy
+        const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT / 2);
+        grad.addColorStop(0, colors[0]);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+
+        // Draw flowing curves
+        ctx.beginPath();
+        ctx.moveTo(0, 100);
+        for (let i = 0; i <= CANVAS_WIDTH; i += 50) {
+            const y = 100 + Math.sin(i * 0.005 + time * 0.001) * 50 + Math.sin(i * 0.01 + time * 0.002) * 30;
+            ctx.lineTo(i, y);
+        }
+        ctx.lineTo(CANVAS_WIDTH, 0);
+        ctx.lineTo(0, 0);
+        ctx.fill();
+
+        // Second Layer
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.moveTo(0, 50);
+        for (let i = 0; i <= CANVAS_WIDTH; i += 60) {
+            const y = 80 + Math.cos(i * 0.004 - time * 0.001) * 60;
+            ctx.lineTo(i, y);
+        }
+        ctx.lineTo(CANVAS_WIDTH, 0);
+        ctx.lineTo(0, 0);
+        ctx.fillStyle = colors[1];
+        ctx.fill();
+
+        ctx.restore();
+    };
+
+    const drawBackgroundLayers = (ctx: CanvasRenderingContext2D, level: typeof LEVELS[0]) => {
+        bgLayersRef.current.forEach((layer, i) => {
+            ctx.save();
+            
+            // Choose color based on type
+            if (layer.type === 'MOUNTAINS') ctx.fillStyle = level.colors.mountains;
+            else if (layer.type === 'CITY') ctx.fillStyle = level.colors.city;
+            else ctx.fillStyle = level.colors.ground;
+
+            // Parallax Scroll calculation
+            const blockWidth = 50;
+            const points = layer.points;
+            if (points.length === 0) return;
+
+            const scrollPos = (distanceRef.current * layer.speedModifier) % (points.length * blockWidth);
+            const startIndex = Math.floor(scrollPos / blockWidth);
+            const offset = scrollPos % blockWidth;
+
+            ctx.beginPath();
+            ctx.moveTo(-blockWidth, CANVAS_HEIGHT); // Start bottom-left offscreen
+
+            for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
+                const idx = (startIndex + j) % points.length;
+                const point = points[idx];
+                const x = j * blockWidth - offset;
+                const nextX = (j + 1) * blockWidth - offset;
+
+                if (layer.type === 'CITY') {
+                    // Step function for buildings
+                    ctx.lineTo(x, CANVAS_HEIGHT - point.height);
+                    ctx.lineTo(nextX, CANVAS_HEIGHT - point.height);
+                } else if (layer.type === 'MOUNTAINS') {
+                     // Jagged peaks
+                     ctx.lineTo(x + blockWidth/2, CANVAS_HEIGHT - point.height);
+                } else {
+                     // Smooth hills
+                     ctx.lineTo(x, CANVAS_HEIGHT - point.height);
+                }
+            }
+
+            ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw Windows for City Layer
+            if (layer.type === 'CITY') {
+                ctx.fillStyle = level.glitchIntensity > 0.5 ? '#ef4444' : '#fbbf24'; // Red if glitch, Gold if normal
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = level.glitchIntensity > 0.5 ? 5 : 10;
+                
+                for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
+                    const idx = (startIndex + j) % points.length;
+                    const point = points[idx];
+                    
+                    if (point.isBuilding && point.hasWindows) {
+                         const x = j * blockWidth - offset;
+                         const h = point.height;
+                         
+                         // Simple grid of windows
+                         const rows = Math.floor(h / 30);
+                         const cols = 2; 
+                         
+                         // Flickering logic
+                         if (Math.random() > 0.95) continue; 
+
+                         for(let r=1; r<rows; r++) {
+                             for(let c=0; c<cols; c++) {
+                                 const wx = x + 10 + c * 20;
+                                 const wy = CANVAS_HEIGHT - h + 10 + r * 25;
+                                 if (wy < CANVAS_HEIGHT - 10) {
+                                     ctx.fillRect(wx, wy, 8, 12);
+                                 }
+                             }
+                         }
+                    }
+                }
+            }
+
+            ctx.restore();
+        });
+    };
+
+    const drawGrid = (ctx: CanvasRenderingContext2D, color: string) => {
         ctx.save();
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.15;
+        ctx.globalAlpha = 0.1;
         const perspective = 0.5;
-        const offset = (distanceRef.current * speed) % 50;
+        const offset = (distanceRef.current * 0.5) % 50;
         ctx.beginPath();
-        for(let i=0; i<CANVAS_HEIGHT; i+=40) { ctx.moveTo(0, i); ctx.lineTo(CANVAS_WIDTH, i); }
-        for(let i=-200; i<CANVAS_WIDTH+200; i+=80) {
+        // Floor Grid only
+        for(let i=-200; i<CANVAS_WIDTH+200; i+=100) {
             const x = i - offset;
-            ctx.moveTo(x, 0); ctx.lineTo(x - (CANVAS_WIDTH/2 - x)*perspective, CANVAS_HEIGHT);
+            ctx.moveTo(x, CANVAS_HEIGHT/2); // Horizon
+            ctx.lineTo(x - (CANVAS_WIDTH/2 - x)*perspective, CANVAS_HEIGHT);
         }
         ctx.stroke();
         ctx.restore();
@@ -420,19 +578,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     const draw = (ctx: CanvasRenderingContext2D, now: number) => {
         const level = LEVELS[Math.max(0, lastLevelIndexRef.current)];
         
-        // Sky
+        // Sky Gradient
         const grad = ctx.createLinearGradient(0,0,0,CANVAS_HEIGHT);
-        grad.addColorStop(0, level.colors.sky[0]); grad.addColorStop(1, level.colors.sky[1]);
+        grad.addColorStop(0, level.colors.sky[0]); 
+        grad.addColorStop(1, level.colors.sky[1]);
         ctx.fillStyle = grad; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+
+        // Aurora
+        drawAurora(ctx, level.colors.aurora, level.glitchIntensity, now);
 
         // Stars
         ctx.save();
         ctx.fillStyle = "#fff";
         starsRef.current.forEach(s => {
-            ctx.globalAlpha = s.opacity * (1 - level.glitchIntensity*0.5); // Stars fade when glitchy
+            const twinkle = Math.sin(now * 0.005 + s.x) * 0.5 + 0.5;
+            ctx.globalAlpha = s.opacity * twinkle; 
             ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill();
         });
         ctx.restore();
+
+        // Environment Layers
+        drawBackgroundLayers(ctx, level);
+
+        // Grid overlay on ground
+        drawGrid(ctx, level.colors.grid);
 
         // Snow/Particles
         if (level.glitchIntensity < 0.6) {
@@ -444,34 +613,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             });
             ctx.restore();
         }
-
-        drawGrid(ctx, level.colors.grid, 0.5);
-
-        // Hills
-        bgLayersRef.current.forEach((layer, i) => {
-            ctx.save();
-            ctx.fillStyle = level.colors.ground; 
-            ctx.globalAlpha = 0.6 - i*0.15;
-            if (layer.points.length > 0) {
-                const blockWidth = 50 + i * 30; 
-                const points = layer.points as any[];
-                const scrollPos = (distanceRef.current * layer.speedModifier) % (points.length * blockWidth);
-                const startIndex = Math.floor(scrollPos / blockWidth);
-                const offset = scrollPos % blockWidth;
-                ctx.beginPath(); ctx.moveTo(-blockWidth, CANVAS_HEIGHT);
-                for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
-                    const idx = (startIndex + j) % points.length;
-                    const b = points[idx]; if (!b) continue;
-                    let h = b.height;
-                    const x = j * blockWidth - offset;
-                    // Smooth curve
-                    ctx.lineTo(x, CANVAS_HEIGHT - h);
-                }
-                ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
-                ctx.fill();
-            }
-            ctx.restore();
-        });
 
         // Camera Shake
         ctx.save();
@@ -487,10 +628,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
 
         ctx.restore();
 
-        // Overlay FX
+        // Overlay FX (Vignette)
         ctx.save();
-        const vigIntensity = 0.1 + (level.glitchIntensity * 0.4);
-        const rad = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT/3, CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT);
+        const vigIntensity = 0.3 + (level.glitchIntensity * 0.2);
+        const rad = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT/2, CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT);
         rad.addColorStop(0, "transparent");
         rad.addColorStop(1, `rgba(0,0,0,${vigIntensity})`);
         ctx.fillStyle = rad;
