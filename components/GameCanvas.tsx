@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { 
   GameState, Player, Obstacle, Powerup, DataLog, Particle, ParticleType, PowerupType, Entity, BackgroundLayer, DialogueLine, GameMode, Landmark, DebugCommand, ScorePopup, ObstacleType
@@ -34,26 +33,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   
   const obstaclesRef = useRef<Obstacle[]>([]);
   const powerupsRef = useRef<Powerup[]>([]);
-  const logsRef = useRef<DataLog[]>([]);
   const landmarksRef = useRef<Landmark[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const scorePopupsRef = useRef<ScorePopup[]>([]);
   
   // Visuals
   const bgLayersRef = useRef<BackgroundLayer[]>([
-    { points: [], color: '#000000', speedModifier: 0.1, offset: 0 }, 
-    { points: [], color: '#000000', speedModifier: 0.3, offset: 0 },  
-    { points: [], color: '#000000', speedModifier: 0.6, offset: 0 },  
+    { points: [], color: '#000000', speedModifier: 0.05, offset: 0 }, 
+    { points: [], color: '#000000', speedModifier: 0.2, offset: 0 },  
+    { points: [], color: '#000000', speedModifier: 0.5, offset: 0 },  
   ]);
-  const matrixRainRef = useRef<{x:number, y:number, speed:number, char:string}[]>([]);
+  const starsRef = useRef<{x:number, y:number, size:number, opacity:number}[]>([]);
   const snowRef = useRef<{x:number, y:number, r:number, speed:number, swing:number}[]>([]);
-
+  
   // Logic
   const shakeRef = useRef(0);
   const isEndingSequenceRef = useRef(false);
   const endingTimerRef = useRef(0);
-
-  // Debug Modifiers
   const speedMultiplierRef = useRef(1.0);
   const progressMultiplierRef = useRef(1.0);
 
@@ -76,10 +72,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     isTimeSlipping: false
   });
 
-  // Handle Debug Commands
+  // Handle Debug
   useEffect(() => {
     if (!debugCommand) return;
-    
     if (debugCommand === 'SKIP_TO_ENDING') {
       distanceRef.current = VICTORY_DISTANCE * 0.96; 
       obstaclesRef.current = [];
@@ -94,13 +89,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     }
     else if (debugCommand === 'INCREASE_SPEED') {
       speedMultiplierRef.current += 0.2;
-      createParticles(playerRef.current.x, playerRef.current.y, ParticleType.THRUST, 30, '#00f3ff');
     }
     else if (debugCommand === 'TOGGLE_HYPER_PROGRESS') {
       progressMultiplierRef.current = progressMultiplierRef.current > 1 ? 1.0 : 10.0;
-      createParticles(playerRef.current.x, playerRef.current.y, ParticleType.GLITCH, 30, '#bc13fe');
     }
-
     if (onDebugCommandHandled) onDebugCommandHandled();
   }, [debugCommand]);
 
@@ -108,15 +100,11 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     for(let i=0; i<count; i++) {
         const speed = type === ParticleType.THRUST ? 4 : 6;
         particlesRef.current.push({ 
-            id:Math.random(), 
-            type, 
-            x, 
-            y, 
+            id:Math.random(), type, x, y, 
             radius: type === ParticleType.SNOW ? Math.random()*2+1 : Math.random()*3+1, 
             vx: type === ParticleType.THRUST ? -Math.random()*speed - 2 : (Math.random()-0.5)*speed, 
             vy: type === ParticleType.THRUST ? (Math.random()-0.5)*1 : (Math.random()-0.5)*speed, 
-            alpha:1, 
-            color, 
+            alpha:1, color, 
             life: type === ParticleType.THRUST ? 0.4 : 1.0, 
             maxLife: type === ParticleType.THRUST ? 0.4 : 1.0 
         });
@@ -124,52 +112,43 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   };
 
   const createScorePopup = (x: number, y: number, value: number, text: string) => {
-     scorePopupsRef.current.push({
-         id: Math.random(), x, y, value, text, life: 1.0, color: '#facc15'
-     });
+     scorePopupsRef.current.push({ id: Math.random(), x, y, value, text, life: 1.0, color: '#facc15' });
   };
 
   // --- Controls ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if(['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
-      
       if (gameState === GameState.MENU) soundManager.init();
       pressedKeysRef.current.add(e.code);
     };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      pressedKeysRef.current.delete(e.code);
-    };
+    const handleKeyUp = (e: KeyboardEvent) => { pressedKeysRef.current.delete(e.code); };
     const handleTouchStart = (e: TouchEvent) => {
        if (gameState === GameState.MENU) soundManager.init();
-       const touchX = e.touches[0].clientX;
-       if (touchX > window.innerWidth * 0.5) pressedKeysRef.current.add('Space');
+       if (e.touches[0].clientX > window.innerWidth * 0.5) pressedKeysRef.current.add('Space');
        else pressedKeysRef.current.add('ShiftLeft'); 
     };
-    const handleTouchEnd = () => {
-       pressedKeysRef.current.clear();
-    };
+    const handleTouchEnd = () => { pressedKeysRef.current.clear(); };
 
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('touchstart', handleTouchStart);
-    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('touchstart', handleTouchStart); window.addEventListener('touchend', handleTouchEnd);
     return () => { 
-        window.removeEventListener('keydown', handleKeyDown); 
-        window.removeEventListener('keyup', handleKeyUp);
-        window.removeEventListener('touchstart', handleTouchStart);
-        window.removeEventListener('touchend', handleTouchEnd);
+        window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp);
+        window.removeEventListener('touchstart', handleTouchStart); window.removeEventListener('touchend', handleTouchEnd);
     };
   }, [gameState]);
 
-  // Main Game Loop & Init
+  // Main Game Loop
   useEffect(() => {
     if (gameState !== GameState.PLAYING && gameState !== GameState.INTRO) return;
 
     const genLandscape = (count: number, minH: number, maxH: number) => {
         const pts = [];
+        let y = (minH + maxH) / 2;
         for (let i = 0; i < count; i++) {
-             pts.push({ height: minH + Math.random() * (maxH - minH), type: Math.floor(Math.random() * 5) });
+             y += (Math.random() - 0.5) * 40;
+             y = Math.max(minH, Math.min(maxH, y));
+             pts.push({ height: y, type: 0 });
         }
         return pts;
     };
@@ -179,34 +158,29 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         bgLayersRef.current[1].points = genLandscape(100, 80, 200);
         bgLayersRef.current[2].points = genLandscape(100, 40, 100);
         
-        // Matrix Rain
-        matrixRainRef.current = [];
-        for(let i=0; i<50; i++) {
-            matrixRainRef.current.push({
-                x: Math.random() * CANVAS_WIDTH,
-                y: Math.random() * CANVAS_HEIGHT,
-                speed: Math.random() * 5 + 2,
-                char: Math.random() > 0.5 ? '1' : '0'
-            });
-        }
-        
-        // Festive Snow
         snowRef.current = [];
-        for(let i=0; i<100; i++) {
+        for(let i=0; i<150; i++) {
             snowRef.current.push({
                 x: Math.random() * CANVAS_WIDTH,
                 y: Math.random() * CANVAS_HEIGHT,
-                r: Math.random() * 3 + 1,
+                r: Math.random() * 2 + 0.5,
                 speed: Math.random() * 2 + 1,
                 swing: Math.random() * Math.PI
             });
         }
+        
+        starsRef.current = [];
+        for(let i=0; i<100; i++) {
+            starsRef.current.push({
+                x: Math.random() * CANVAS_WIDTH,
+                y: Math.random() * CANVAS_HEIGHT,
+                size: Math.random() * 2,
+                opacity: Math.random()
+            });
+        }
     }
 
-    try {
-        soundManager.init();
-        soundManager.reset();
-    } catch(e) { console.warn("Audio init warning", e); }
+    try { soundManager.init(); soundManager.reset(); } catch(e) {}
 
     let animId: number;
     const ctx = canvasRef.current?.getContext('2d', { alpha: false });
@@ -215,14 +189,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     const resetGame = () => {
       playerRef.current = { 
           id: 0, x: 100, y: 300, width: 80, height: 40, markedForDeletion: false, vy: 0, integrity: 100, stability: 100, maxStability: 100, 
-          isTimeSlipping: false, angle: 0, isThrusting: false, godMode: false,
-          combo: 1, comboTimer: 0
+          isTimeSlipping: false, angle: 0, isThrusting: false, godMode: false, combo: 1, comboTimer: 0
       };
-      obstaclesRef.current = []; powerupsRef.current = []; logsRef.current = []; landmarksRef.current = []; particlesRef.current = []; scorePopupsRef.current = [];
+      obstaclesRef.current = []; powerupsRef.current = []; landmarksRef.current = []; particlesRef.current = []; scorePopupsRef.current = [];
       distanceRef.current = 0; scoreRef.current = 0; timeRef.current = TOTAL_GAME_TIME_SECONDS;
       triggeredEventsRef.current.clear(); isEndingSequenceRef.current = false; endingTimerRef.current = 0;
-      lastLevelIndexRef.current = 0;
-      speedMultiplierRef.current = 1.0; progressMultiplierRef.current = 1.0;
+      lastLevelIndexRef.current = 0; speedMultiplierRef.current = 1.0; progressMultiplierRef.current = 1.0;
       soundManager.stopBgm();
     };
 
@@ -236,19 +208,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
       draw(ctx, now);
 
       if (gameState === GameState.INTRO) { animId = requestAnimationFrame(render); return; }
-
-      if (playerRef.current.integrity > 0) {
-          animId = requestAnimationFrame(render);
-      } else {
-          setGameState(GameState.GAME_OVER);
-      }
+      if (playerRef.current.integrity > 0) animId = requestAnimationFrame(render);
+      else setGameState(GameState.GAME_OVER);
     };
 
     const update = (dt: number, now: number) => {
       const player = playerRef.current;
       const timeScale = dt * 60;
 
-      // 1. Inputs & Physics
+      // Physics
       if (!isEndingSequenceRef.current) {
           if (pressedKeysRef.current.has('Space') || pressedKeysRef.current.has('ArrowUp')) {
               player.vy += THRUST_POWER * timeScale; 
@@ -258,52 +226,39 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
               player.isThrusting = false;
           }
           
-          // Time Slip Logic
           const wantsToSlip = (pressedKeysRef.current.has('ShiftLeft') || pressedKeysRef.current.has('ShiftRight') || pressedKeysRef.current.has('KeyZ'));
-          
           if (wantsToSlip && player.stability > 0) {
               if (player.stability > STABILITY_MIN_ACTIVATION || player.isTimeSlipping) {
                  player.isTimeSlipping = true;
                  if (!player.godMode) player.stability -= STABILITY_DRAIN_RATE * dt;
                  createParticles(player.x + Math.random()*player.width, player.y + Math.random()*player.height, ParticleType.TIME_DUST, 1, '#06b6d4');
-              } else {
-                 player.isTimeSlipping = false; 
-              }
+              } else { player.isTimeSlipping = false; }
           } else {
               player.isTimeSlipping = false;
               player.stability = Math.min(player.maxStability, player.stability + STABILITY_RECHARGE_RATE * dt);
           }
           if (player.stability <= 0) player.isTimeSlipping = false;
-
           soundManager.setPhaseVolume(player.isTimeSlipping);
 
           player.vy += GRAVITY * timeScale;
           player.vy = Math.min(player.vy, MAX_FALL_SPEED);
           player.y += player.vy * timeScale;
-          
-          const targetAngle = player.vy * 0.05;
-          player.angle += (targetAngle - player.angle) * 0.1 * timeScale;
+          player.angle += (player.vy * 0.05 - player.angle) * 0.1 * timeScale;
 
-          // Bounds
           if (player.y < 0) { player.y = 0; player.vy = 0; }
           if (player.y > CANVAS_HEIGHT - 60) { player.y = CANVAS_HEIGHT - 60; player.vy = 0; }
       }
 
-      // Combo Decay
       if (player.combo > 1) {
           player.comboTimer -= dt;
-          if (player.comboTimer <= 0) {
-              player.combo = 1; 
-          }
+          if (player.comboTimer <= 0) player.combo = 1; 
       }
 
-      // 2. Progression
-      const speedMult = speedMultiplierRef.current;
+      // Progression
       let progressRatio = distanceRef.current / VICTORY_DISTANCE;
       if (gameMode === GameMode.STORY) progressRatio = Math.min(1.02, progressRatio);
 
-      const currentSpeed = isEndingSequenceRef.current ? BASE_SPEED * 0.5 : BASE_SPEED * speedMult;
-      
+      const currentSpeed = isEndingSequenceRef.current ? BASE_SPEED * 0.5 : BASE_SPEED * speedMultiplierRef.current;
       soundManager.setEnginePitch(player.isThrusting ? 0.8 : 0.2);
 
       let levelIndex = 0;
@@ -311,74 +266,46 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
       for (let i = LEVELS.length - 1; i >= 0; i--) { if (progressPercent >= LEVEL_THRESHOLDS[i]) { levelIndex = i; break; }}
       
       if (levelIndex !== lastLevelIndexRef.current) {
-          const l = LEVELS[levelIndex];
-          soundManager.playLevelBgm(l.musicTrack);
+          soundManager.playLevelBgm(LEVELS[levelIndex].musicTrack);
           lastLevelIndexRef.current = levelIndex;
       }
-      const level = LEVELS[levelIndex] || LEVELS[0];
+      const level = LEVELS[levelIndex];
 
       if (gameMode === GameMode.STORY && progressRatio >= 0.96 && !isEndingSequenceRef.current) {
           isEndingSequenceRef.current = true;
           player.isTimeSlipping = true; 
           player.godMode = true;
           soundManager.playEndingMusic();
-
-          const vortexExists = landmarksRef.current.some(l => l.type === 'TIME_VORTEX');
-          if (!vortexExists) {
+          if (!landmarksRef.current.some(l => l.type === 'TIME_VORTEX')) {
              landmarksRef.current.push({
                  id: Date.now(), x: CANVAS_WIDTH + 100, y: CANVAS_HEIGHT/2, width: 300, height: 300,
                  type: 'TIME_VORTEX', name: 'The Singularity', markedForDeletion: false
              });
-             triggeredEventsRef.current.add('TIME_VORTEX');
           }
       }
 
       if (isEndingSequenceRef.current) {
           player.y += (CANVAS_HEIGHT/2 - player.y) * 0.05 * timeScale;
           endingTimerRef.current += dt;
-          if (endingTimerRef.current > 4.0) {
-               setGameState(GameState.VICTORY); onWin();
-          }
+          if (endingTimerRef.current > 4.0) { setGameState(GameState.VICTORY); onWin(); }
       } else {
-          const distanceGain = currentSpeed * timeScale * progressMultiplierRef.current;
-          distanceRef.current += distanceGain;
-          scoreRef.current += distanceGain * 0.1 * player.combo;
+          distanceRef.current += currentSpeed * timeScale * progressMultiplierRef.current;
+          scoreRef.current += currentSpeed * timeScale * 0.1 * player.combo;
           timeRef.current -= dt;
       }
 
-      // 3. Spawning
+      // Spawning
       if (!isEndingSequenceRef.current) {
-          // Obstacles
-          const spawnChance = 0.02 * level.spawnRate * timeScale;
-          if (Math.random() < spawnChance && level.allowedObstacles.length > 0) {
-              const types = level.allowedObstacles;
-              let type = types[Math.floor(Math.random() * types.length)];
-              
+          if (Math.random() < 0.02 * level.spawnRate * timeScale && level.allowedObstacles.length > 0) {
+              const type = level.allowedObstacles[Math.floor(Math.random() * level.allowedObstacles.length)];
               let y = Math.random() * (CANVAS_HEIGHT - 100);
-              let w = 50; let h = 50;
-              let score = 100;
+              let w = 50, h = 50, score = 100;
               
-              if (type === 'GLITCH_ELF' || type === 'SNOWMAN') {
-                  w = 40; h = 60; score = 200;
-              } else if (type === 'STATIC_CLOUD') {
-                  h = 80; w = 120; score = 150;
-              } else if (type === 'CLOCKWORK_GEAR') {
-                  w = 60; h = 60; score = 300;
-              } else if (type === 'DRONE_SENTINEL') {
-                  w = 50; h = 40; score = 400;
-              } else if (type === 'TIME_RIFT') {
-                  w = 30; h = 150; score = 500;
-                  y = Math.random() * (CANVAS_HEIGHT - h);
-              } else if (type === 'PRESENT_STACK') {
-                  w = 40; h = 80; score = 150;
-                  y = CANVAS_HEIGHT - 120 - Math.random() * 50; // Near ground
-              } else if (type === 'DECORATED_TREE') {
-                  w = 80; h = 120; score = 100;
-                  y = CANVAS_HEIGHT - 150;
-              } else if (type === 'FESTIVE_ARCH') {
-                  w = 50; h = 200; score = 250;
-                  y = Math.random() > 0.5 ? 0 : CANVAS_HEIGHT - 200;
-              }
+              if (['GLITCH_ELF','SNOWMAN'].includes(type)) { w=40; h=60; score=200; }
+              else if (type === 'STATIC_CLOUD') { h=80; w=120; score=150; }
+              else if (type === 'TIME_RIFT') { w=30; h=150; score=500; y = Math.random()*(CANVAS_HEIGHT-h); }
+              else if (type === 'DECORATED_TREE') { w=80; h=120; score=100; y = CANVAS_HEIGHT-150; }
+              else if (type === 'FESTIVE_ARCH') { w=50; h=200; score=250; y = Math.random()>0.5 ? 0 : CANVAS_HEIGHT-200; }
 
               obstaclesRef.current.push({
                   id: Date.now(), x: CANVAS_WIDTH + 50, y, width: w, height: h,
@@ -395,7 +322,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
           }
       }
 
-      // Narrative Spawning
       if (gameMode === GameMode.STORY) {
          STORY_MOMENTS.forEach(m => {
              if (progressRatio >= m.progress && !triggeredEventsRef.current.has(m.dialogue.id)) {
@@ -415,52 +341,36 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
          });
       }
 
-      // 4. Collisions
-      
+      // Collisions & Updates
       obstaclesRef.current.forEach(obs => {
           obs.x -= currentSpeed * level.obstacleSpeed * timeScale;
           if (obs.x < -100) obs.markedForDeletion = true;
-          if (obs.type === 'CLOCKWORK_GEAR' || obs.type === 'GLITCH_ELF') obs.rotation! += 0.05 * timeScale;
-          
-          if (obs.type === 'DRONE_SENTINEL') {
-              obs.y += (player.y - obs.y) * 0.02 * timeScale;
-          }
+          if (['CLOCKWORK_GEAR','GLITCH_ELF'].includes(obs.type)) obs.rotation! += 0.05 * timeScale;
+          if (obs.type === 'DRONE_SENTINEL') obs.y += (player.y - obs.y) * 0.02 * timeScale;
 
-          // Player vs Obstacle Collision
           if (!obs.markedForDeletion && checkCollision(player, obs)) {
               if (player.isTimeSlipping || player.godMode) {
-                  // Stabilize
                   if (!obs.stabilized) {
                       obs.stabilized = true;
                       soundManager.playScanSuccess();
                       createParticles(obs.x + obs.width/2, obs.y + obs.height/2, ParticleType.GLITCH, 8, '#06b6d4');
-                      
-                      // Reward
                       player.stability = Math.min(player.maxStability, player.stability + STABILITY_RESTORE_REWARD);
-                      
                       player.combo = Math.min(50, player.combo + 1);
                       player.comboTimer = COMBO_DECAY;
-                      const val = obs.scoreValue * player.combo;
-                      scoreRef.current += val;
-                      createScorePopup(player.x, player.y - 20, val, `STABILIZED ${player.combo}x`);
+                      scoreRef.current += obs.scoreValue * player.combo;
+                      createScorePopup(player.x, player.y - 20, obs.scoreValue * player.combo, `${player.combo}x`);
                   }
               } else {
-                  // Collision Damage
                   player.integrity -= 20;
                   soundManager.playDamage();
                   shakeRef.current = 20;
                   obs.markedForDeletion = true;
-                  // Reset Combo
-                  if (player.combo > 1) {
-                      createScorePopup(player.x, player.y - 20, 0, "CHAIN BROKEN");
-                      player.combo = 1;
-                  }
+                  player.combo = 1;
                   createParticles(player.x + 20, player.y + 10, ParticleType.SPARK, 15, '#f87171');
               }
           }
       });
 
-      // Powerups
       powerupsRef.current.forEach(p => {
           p.x -= currentSpeed * timeScale;
           p.floatOffset += 0.05 * timeScale;
@@ -472,76 +382,33 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
               if (p.type === PowerupType.HULL_REPAIR) player.integrity = Math.min(100, player.integrity + 30);
               if (p.type === PowerupType.DATA_FRAGMENT) scoreRef.current += 1000;
               if (p.type === PowerupType.TIME_FREEZE) player.stability = player.maxStability; 
-              createScorePopup(p.x, p.y, 500, p.type);
+              createScorePopup(p.x, p.y, 500, "DATA");
           }
       });
 
-      // Environment
       landmarksRef.current.forEach(l => { l.x -= currentSpeed * timeScale; });
+      particlesRef.current.forEach(p => { p.life -= dt; p.x += p.vx * timeScale; p.y += p.vy * timeScale; });
+      scorePopupsRef.current.forEach(p => { p.life -= dt; p.y -= 1 * timeScale; });
+      snowRef.current.forEach(s => { s.y += s.speed * timeScale; s.x += Math.sin(s.swing += 0.05 * timeScale) * 0.5; if (s.y > CANVAS_HEIGHT) s.y = -5; if (s.x > CANVAS_WIDTH) s.x = 0; });
 
-      // Particles
-      particlesRef.current.forEach(p => {
-          p.life -= dt;
-          p.x += p.vx * timeScale;
-          p.y += p.vy * timeScale;
-      });
-      
-      // Score Popups
-      scorePopupsRef.current.forEach(p => {
-          p.life -= dt;
-          p.y -= 1 * timeScale; // Float up
-      });
-
-      // Matrix Rain
-      matrixRainRef.current.forEach(r => {
-          r.y += r.speed * timeScale;
-          if (r.y > CANVAS_HEIGHT) r.y = -10;
-          // Randomly change char
-          if (Math.random() < 0.1) r.char = Math.random() > 0.5 ? '1' : '0';
-      });
-
-      // Snow
-      snowRef.current.forEach(s => {
-          s.y += s.speed * timeScale;
-          s.x += Math.sin(s.swing += 0.05 * timeScale) * 0.5;
-          if (s.y > CANVAS_HEIGHT) s.y = -5;
-          if (s.x > CANVAS_WIDTH) s.x = 0;
-      });
-
-      // Cleanup
       obstaclesRef.current = obstaclesRef.current.filter(e => !e.markedForDeletion);
       powerupsRef.current = powerupsRef.current.filter(e => !e.markedForDeletion);
       particlesRef.current = particlesRef.current.filter(p => p.life > 0);
       scorePopupsRef.current = scorePopupsRef.current.filter(p => p.life > 0);
 
       if (shakeRef.current > 0) shakeRef.current *= 0.9;
-
-      if (now % 100 < 20) {
-          setHudState({ 
-            integrity: player.integrity, stability: player.stability, isTimeSlipping: player.isTimeSlipping,
-            progress: progressPercent, timeLeft: timeRef.current, levelIndex, score: scoreRef.current,
-            activeDialogue: activeDialogueRef.current, activeLog: activeLogRef.current,
-            combo: player.combo
-          });
-      }
+      if (now % 100 < 20) setHudState({ integrity: player.integrity, stability: player.stability, isTimeSlipping: player.isTimeSlipping, progress: progressPercent, timeLeft: timeRef.current, levelIndex, score: scoreRef.current, activeDialogue: activeDialogueRef.current, activeLog: activeLogRef.current, combo: player.combo });
     };
 
     const drawGrid = (ctx: CanvasRenderingContext2D, color: string, speed: number) => {
         ctx.save();
         ctx.strokeStyle = color;
         ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.2;
-        
+        ctx.globalAlpha = 0.15;
         const perspective = 0.5;
         const offset = (distanceRef.current * speed) % 50;
-
         ctx.beginPath();
-        // Horizontal lines moving
-        for(let i=0; i<CANVAS_HEIGHT; i+=40) {
-             const y = i;
-             ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y);
-        }
-        // Vertical lines (perspective)
+        for(let i=0; i<CANVAS_HEIGHT; i+=40) { ctx.moveTo(0, i); ctx.lineTo(CANVAS_WIDTH, i); }
         for(let i=-200; i<CANVAS_WIDTH+200; i+=80) {
             const x = i - offset;
             ctx.moveTo(x, 0); ctx.lineTo(x - (CANVAS_WIDTH/2 - x)*perspective, CANVAS_HEIGHT);
@@ -551,69 +418,54 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     };
 
     const draw = (ctx: CanvasRenderingContext2D, now: number) => {
-        const levelIndex = Math.max(0, lastLevelIndexRef.current);
-        const level = LEVELS[levelIndex] || LEVELS[0];
+        const level = LEVELS[Math.max(0, lastLevelIndexRef.current)];
         
-        // 1. Dynamic Sky Gradient
+        // Sky
         const grad = ctx.createLinearGradient(0,0,0,CANVAS_HEIGHT);
         grad.addColorStop(0, level.colors.sky[0]); grad.addColorStop(1, level.colors.sky[1]);
         ctx.fillStyle = grad; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
 
-        // Matrix Rain (Opacity depends on glitch intensity)
-        if (level.glitchIntensity > 0) {
-            ctx.save();
-            ctx.fillStyle = level.colors.grid;
-            ctx.font = '10px monospace';
-            ctx.globalAlpha = 0.2 * level.glitchIntensity;
-            matrixRainRef.current.forEach(r => {
-                ctx.fillText(r.char, r.x, r.y);
-            });
-            ctx.restore();
-        }
+        // Stars
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        starsRef.current.forEach(s => {
+            ctx.globalAlpha = s.opacity * (1 - level.glitchIntensity*0.5); // Stars fade when glitchy
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill();
+        });
+        ctx.restore();
 
-        // Snow (Only in early levels or as "glitch snow" later)
-        if (level.glitchIntensity < 0.5) {
+        // Snow/Particles
+        if (level.glitchIntensity < 0.6) {
             ctx.save();
             ctx.fillStyle = "white";
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.4;
             snowRef.current.forEach(s => {
                 ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
             });
             ctx.restore();
         }
 
-        // 2. Grid Floor
         drawGrid(ctx, level.colors.grid, 0.5);
 
-        // 3. Parallax Landscape
+        // Hills
         bgLayersRef.current.forEach((layer, i) => {
             ctx.save();
             ctx.fillStyle = level.colors.ground; 
-            // Darken further back layers
-            if (i > 0) ctx.globalAlpha = 0.7 - i*0.2;
-            
+            ctx.globalAlpha = 0.6 - i*0.15;
             if (layer.points.length > 0) {
                 const blockWidth = 50 + i * 30; 
                 const points = layer.points as any[];
                 const scrollPos = (distanceRef.current * layer.speedModifier) % (points.length * blockWidth);
                 const startIndex = Math.floor(scrollPos / blockWidth);
                 const offset = scrollPos % blockWidth;
-
-                ctx.beginPath();
-                ctx.moveTo(-blockWidth, CANVAS_HEIGHT);
-                
+                ctx.beginPath(); ctx.moveTo(-blockWidth, CANVAS_HEIGHT);
                 for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
                     const idx = (startIndex + j) % points.length;
-                    const b = points[idx];
-                    if (!b) continue;
-                    
+                    const b = points[idx]; if (!b) continue;
                     let h = b.height;
-                    // Glitch effect on terrain in later levels
-                    if (level.glitchIntensity > 0.5 && Math.random() < 0.05) h += Math.random() * 50 - 25;
-
                     const x = j * blockWidth - offset;
+                    // Smooth curve
                     ctx.lineTo(x, CANVAS_HEIGHT - h);
-                    ctx.lineTo(x + blockWidth, CANVAS_HEIGHT - h);
                 }
                 ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
                 ctx.fill();
@@ -621,7 +473,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.restore();
         });
 
-        // 5. Entities
+        // Camera Shake
         ctx.save();
         const dx = (Math.random()-0.5)*shakeRef.current; const dy = (Math.random()-0.5)*shakeRef.current;
         ctx.translate(dx, dy);
@@ -629,26 +481,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         landmarksRef.current.forEach(l => drawLandmark(ctx, l));
         obstaclesRef.current.forEach(o => drawObstacle(ctx, o, now));
         powerupsRef.current.forEach(p => drawPowerup(ctx, p));
-
         drawPlayer(ctx, playerRef.current);
-        
         particlesRef.current.forEach(p => drawParticle(ctx, p));
         scorePopupsRef.current.forEach(p => drawScorePopup(ctx, p));
 
         ctx.restore();
 
-        // Vignette & Scanlines
+        // Overlay FX
         ctx.save();
-        // Vignette gets stronger in glitch levels
         const vigIntensity = 0.1 + (level.glitchIntensity * 0.4);
-        ctx.fillStyle = `rgba(0,0,0,${vigIntensity})`;
-        
-        // Scanlines only in glitch levels
-        if (level.glitchIntensity > 0.2) {
-             for(let y=0; y<CANVAS_HEIGHT; y+=4) {
-                ctx.fillRect(0, y, CANVAS_WIDTH, 1);
-            }
-        }
+        const rad = ctx.createRadialGradient(CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT/3, CANVAS_WIDTH/2, CANVAS_HEIGHT/2, CANVAS_HEIGHT);
+        rad.addColorStop(0, "transparent");
+        rad.addColorStop(1, `rgba(0,0,0,${vigIntensity})`);
+        ctx.fillStyle = rad;
+        ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
         ctx.restore();
     };
 
@@ -656,8 +502,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         ctx.save();
         ctx.globalAlpha = Math.max(0, s.life);
         ctx.fillStyle = s.color;
-        ctx.shadowColor = s.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowColor = s.color; ctx.shadowBlur = 10;
         ctx.font = 'bold 20px Orbitron';
         ctx.fillText(s.text || `+${s.value}`, s.x, s.y);
         ctx.restore();
@@ -666,72 +511,65 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
         ctx.save();
         ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-        
         ctx.fillStyle = p.color;
-        if (p.type === ParticleType.GLITCH) {
-             ctx.fillRect(p.x, p.y, p.radius*2, p.radius*2);
-        } else {
-             ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
-        }
+        ctx.shadowColor = p.color; ctx.shadowBlur = 5;
+        if (p.type === ParticleType.GLITCH) ctx.fillRect(p.x, p.y, p.radius*2, p.radius*2);
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); }
         ctx.restore();
     };
 
     const drawPlayer = (ctx: CanvasRenderingContext2D, p: Player) => {
         ctx.save(); ctx.translate(p.x + p.width/2, p.y + p.height/2); ctx.rotate(p.angle);
         
-        // Time Slip Visuals
         if (p.isTimeSlipping) {
              ctx.globalAlpha = 0.5;
              ctx.shadowColor = "#06b6d4"; ctx.shadowBlur = 20;
-             // Draw "Afterimages"
              ctx.fillStyle = "rgba(6, 182, 212, 0.3)";
              ctx.fillRect(-50, -20, 100, 40);
         } else {
              ctx.globalAlpha = 1.0;
-             ctx.shadowColor = "#ef4444"; ctx.shadowBlur = 10;
+             ctx.shadowColor = "#ef4444"; ctx.shadowBlur = 15;
         }
 
-        // Santa's Sleigh (Red & Gold)
-        ctx.fillStyle = "#991b1b"; // Deep Red
-        
-        // Sleigh Body
+        // Sleigh Body - Premium Curve
+        ctx.fillStyle = "#991b1b"; 
         ctx.beginPath(); 
-        ctx.moveTo(30, -10); 
-        ctx.lineTo(-40, -10);
-        ctx.quadraticCurveTo(-50, 0, -40, 20);
-        ctx.lineTo(20, 20);
-        ctx.quadraticCurveTo(40, 0, 30, -10);
+        ctx.moveTo(35, -10); ctx.lineTo(-45, -10);
+        ctx.bezierCurveTo(-55, 0, -55, 25, -45, 25);
+        ctx.lineTo(25, 25);
+        ctx.bezierCurveTo(45, 25, 45, 0, 35, -10);
         ctx.fill();
 
-        // Gold Trim
-        ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 2;
-        ctx.stroke();
+        // Gold Rails
+        ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 3; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(-40, 30); ctx.lineTo(40, 30); 
+        ctx.moveTo(-40, 30); ctx.quadraticCurveTo(-60, 20, -60, -5); ctx.stroke();
 
-        // Santa Sprite
-        ctx.fillStyle = "#fff"; // Beard
-        ctx.beginPath(); ctx.arc(0, -15, 8, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = "#ef4444"; // Hat
-        ctx.beginPath(); ctx.moveTo(-8, -18); ctx.lineTo(8, -18); ctx.lineTo(0, -30); ctx.fill();
+        // Santa
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, -15, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.moveTo(-8, -18); ctx.lineTo(8, -18); ctx.lineTo(0, -32); ctx.fill();
 
-        // Magic Thrusters (Time Engine)
+        // Thruster Glow
         if (p.isThrusting) {
             ctx.fillStyle = p.isTimeSlipping ? "#06b6d4" : "#f59e0b";
-            ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 30;
-            ctx.beginPath();
-            ctx.ellipse(-45, 10, 10, 5, 0, 0, Math.PI*2);
-            ctx.fill();
+            ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 40;
+            ctx.beginPath(); ctx.ellipse(-50, 15, 12, 6, 0, 0, Math.PI*2); ctx.fill();
         }
 
-        // Reindeer 
-        ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = 0.6;
-        ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(70, -10); ctx.stroke();
-        
-        // Simple Reindeer graphic
-        ctx.fillStyle = "#78350f"; // Brown
-        ctx.beginPath(); ctx.ellipse(80, -5, 15, 8, 0, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = "#ef4444"; // Red nose
-        ctx.beginPath(); ctx.arc(95, -5, 3, 0, Math.PI*2); ctx.fill();
+        // Reindeer Trail
+        if (p.isThrusting) {
+             ctx.fillStyle = "#fbbf24"; ctx.globalAlpha = 0.5;
+             ctx.beginPath(); ctx.arc(90, -5, Math.random()*3, 0, Math.PI*2); ctx.fill();
+        }
 
+        // Reindeer
+        ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(75, -5); ctx.stroke();
+        
+        ctx.fillStyle = "#78350f"; ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.ellipse(80, -5, 15, 8, 0, 0, Math.PI*2); ctx.fill(); // Body
+        ctx.beginPath(); ctx.ellipse(95, -15, 6, 4, 0, 0, Math.PI*2); ctx.fill(); // Head
+        ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(101, -15, 2, 0, Math.PI*2); ctx.fill(); // Nose
 
         ctx.restore();
     };
@@ -740,180 +578,118 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         ctx.save(); ctx.translate(o.x + o.width/2, o.y + o.height/2);
         
         if (o.stabilized) {
-            ctx.globalAlpha = 0.3;
-            ctx.strokeStyle = "#06b6d4";
+            ctx.globalAlpha = 0.4;
+            ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 2;
+            ctx.shadowColor = "#06b6d4"; ctx.shadowBlur = 10;
             ctx.strokeRect(-o.width/2, -o.height/2, o.width, o.height);
-            ctx.restore();
-            return;
+            ctx.restore(); return;
         }
 
-        // --- FESTIVE OBSTACLES ---
+        // Premium Shadows for all objects
+        ctx.shadowColor = "rgba(0,0,0,0.5)"; ctx.shadowBlur = 10;
+
         if (o.type === 'SNOWMAN') {
              ctx.fillStyle = "#fff";
-             ctx.beginPath(); ctx.arc(0, 15, 20, 0, Math.PI*2); ctx.fill(); // Base
-             ctx.beginPath(); ctx.arc(0, -10, 15, 0, Math.PI*2); ctx.fill(); // Head
-             ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(10,-8); ctx.lineTo(0,-6); ctx.fill(); // Nose
-             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -8, 30, 4); // Scarf
-        } 
-        else if (o.type === 'PRESENT_STACK') {
-             ctx.fillStyle = "#16a34a"; ctx.fillRect(-20, -10, 40, 40); // Bottom
-             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -35, 30, 25); // Top
-             ctx.fillStyle = "#fbbf24"; ctx.fillRect(-5, -35, 10, 65); // Ribbon
-        }
-        else if (o.type === 'DECORATED_TREE') {
+             ctx.beginPath(); ctx.arc(0, 15, 20, 0, Math.PI*2); ctx.fill();
+             ctx.beginPath(); ctx.arc(0, -10, 15, 0, Math.PI*2); ctx.fill();
+             ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(12,-7); ctx.lineTo(0,-4); ctx.fill();
+             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -8, 30, 4);
+        } else if (o.type === 'PRESENT_STACK') {
+             ctx.fillStyle = "#16a34a"; ctx.fillRect(-20, -10, 40, 40);
+             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -35, 30, 25);
+             ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 4;
+             ctx.strokeRect(-20, -10, 40, 40); ctx.strokeRect(-15, -35, 30, 25);
+        } else if (o.type === 'DECORATED_TREE') {
              ctx.fillStyle = "#14532d"; 
-             ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(30, 50); ctx.lineTo(-30, 50); ctx.fill();
-             // Ornaments
-             ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(-10, 0, 4, 0, Math.PI*2); ctx.fill();
-             ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(10, 20, 4, 0, Math.PI*2); ctx.fill();
-             ctx.fillStyle = "#3b82f6"; ctx.beginPath(); ctx.arc(5, -20, 4, 0, Math.PI*2); ctx.fill();
-        }
-        else if (o.type === 'FESTIVE_ARCH') {
-            ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 10;
-            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
-            ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
-            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
-        }
-
-        // --- GLITCH OBSTACLES ---
-        else if (o.type === 'CLOCKWORK_GEAR') {
-             ctx.rotate(o.rotation || 0);
-             ctx.fillStyle = "#b45309"; // Bronze
-             ctx.beginPath();
-             const outerRadius = o.width/2;
-             const innerRadius = o.width/2 - 5;
-             const holeRadius = 10;
-             const teeth = 8;
-             for (let i = 0; i < teeth * 2; i++) {
-                const angle = (Math.PI * 2 * i) / (teeth * 2);
-                const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
-             }
-             ctx.closePath();
-             ctx.fill();
-             ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(0,0, holeRadius, 0, Math.PI*2); ctx.fill();
-
+             ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(35, 50); ctx.lineTo(-35, 50); ctx.fill();
+             ctx.shadowBlur = 5; ctx.shadowColor = "#fbbf24";
+             ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(0, -50, 5, 0, Math.PI*2); ctx.fill();
         } else if (o.type === 'TIME_RIFT') {
              const h = o.height;
-             ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 20;
+             ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 30;
              ctx.strokeStyle = "#d8b4fe"; ctx.lineWidth = 3;
+             ctx.beginPath(); ctx.moveTo(0, -h/2);
+             for(let i=0; i<10; i++) ctx.lineTo((Math.random()-0.5)*25, -h/2 + (h/10)*i);
+             ctx.lineTo(0, h/2); ctx.stroke();
+        } else if (o.type === 'CLOCKWORK_GEAR') {
+             ctx.rotate(o.rotation || 0);
+             ctx.fillStyle = "#b45309"; 
              ctx.beginPath();
-             ctx.moveTo(0, -h/2);
-             for(let i=0; i<10; i++) {
-                 ctx.lineTo((Math.random()-0.5)*20, -h/2 + (h/10)*i);
+             const outer = o.width/2, inner = o.width/2-6;
+             for (let i = 0; i < 16; i++) {
+                const a = (Math.PI*2*i)/16; const r = i%2===0?outer:inner;
+                ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
              }
-             ctx.lineTo(0, h/2);
-             ctx.stroke();
-
+             ctx.closePath(); ctx.fill();
+             ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.fill();
+        } else if (o.type === 'STATIC_CLOUD') {
+             const w = o.width; 
+             const grad = ctx.createRadialGradient(0,0, 0, 0,0, w/2);
+             grad.addColorStop(0, "rgba(255,255,255,0.8)"); grad.addColorStop(1, "transparent");
+             ctx.fillStyle = grad;
+             ctx.beginPath(); ctx.arc(0,0, w/2, 0, Math.PI*2); ctx.fill();
+        } else if (o.type === 'FESTIVE_ARCH') {
+            ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 12;
+            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
+            ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
+            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
         } else if (o.type === 'DRONE_SENTINEL') {
-            ctx.fillStyle = "#1e293b";
-            ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = "#ef4444"; ctx.shadowColor="#ef4444"; ctx.shadowBlur=10;
-            ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill(); 
-
+            ctx.fillStyle = "#0f172a"; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = "#ef4444"; ctx.shadowColor="#ef4444"; ctx.shadowBlur=15;
+            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill(); 
         } else if (o.type === 'GLITCH_ELF') {
             ctx.rotate(o.rotation || 0);
-            ctx.fillStyle = Math.random() > 0.5 ? "#166534" : "#ff00ff"; // Flashing color
+            ctx.fillStyle = Math.random() > 0.5 ? "#166534" : "#ff00ff";
             ctx.fillRect(-15, -15, 30, 30);
-            ctx.fillStyle = "#000";
-            ctx.fillRect(Math.random()*20 - 10, Math.random()*20 - 10, 10, 2);
-
-        } else if (o.type === 'STATIC_CLOUD') {
-             const w = o.width; const h = o.height;
-             const grad = ctx.createRadialGradient(0,0, 0, 0,0, w/2);
-             grad.addColorStop(0, "#ffffff"); grad.addColorStop(1, "transparent");
-             ctx.fillStyle = grad;
-             ctx.globalAlpha = 0.5;
-             ctx.beginPath(); ctx.arc(0,0, w/2, 0, Math.PI*2); ctx.fill();
         }
         ctx.restore();
     };
 
     const drawLandmark = (ctx: CanvasRenderingContext2D, lm: Landmark) => {
         ctx.save(); ctx.translate(lm.x, lm.y - 150);
+        ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 20;
         if (lm.type === 'TIME_VORTEX') {
-            ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 80;
+            ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 60;
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
-            const t = Date.now() / 1000;
-            ctx.rotate(t);
+            const t = Date.now() / 1000; ctx.rotate(t);
             ctx.beginPath();
-            for (let i = 0; i < 100; i++) {
-              const angle = 0.1 * i;
-              const x = (1 + angle) * Math.cos(angle);
-              const y = (1 + angle) * Math.sin(angle);
-              ctx.lineTo(x, y);
-            }
+            for (let i = 0; i < 50; i++) { const a=0.2*i; ctx.lineTo((1+a)*Math.cos(a), (1+a)*Math.sin(a)); }
             ctx.stroke();
-            
         } else if (lm.type === 'CLOCK_TOWER') {
-            ctx.fillStyle = "#1e1b4b"; 
-            ctx.fillRect(-40, 0, 80, 400);
+            ctx.fillStyle = "#1e1b4b"; ctx.fillRect(-40, 0, 80, 400);
             ctx.fillStyle = "#fff"; ctx.shadowColor="#fff"; ctx.shadowBlur=20;
             ctx.beginPath(); ctx.arc(0, 50, 30, 0, Math.PI*2); ctx.fill();
-            ctx.strokeStyle = "#000"; ctx.lineWidth=3;
-            ctx.beginPath(); ctx.moveTo(0,50); ctx.lineTo(0, 30); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0,50); ctx.lineTo(15, 50); ctx.stroke();
-
         } else if (lm.type === 'GRAND_TREE') {
-            // Big Christmas Tree
-            ctx.fillStyle = "#064e3b";
-            ctx.beginPath(); ctx.moveTo(0,-200); ctx.lineTo(100, 300); ctx.lineTo(-100, 300); ctx.fill();
-            // Star
+            ctx.fillStyle = "#064e3b"; ctx.beginPath(); ctx.moveTo(0,-200); ctx.lineTo(100, 300); ctx.lineTo(-100, 300); ctx.fill();
             ctx.fillStyle = "#facc15"; ctx.shadowColor="#facc15"; ctx.shadowBlur=30;
             ctx.beginPath(); ctx.arc(0, -200, 20, 0, Math.PI*2); ctx.fill();
-
         } else if (lm.type === 'TOY_WORKSHOP') {
-            ctx.fillStyle = "#7f1d1d";
-            ctx.fillRect(-150, 100, 300, 200);
-            ctx.fillStyle = "#fbbf24"; // Windows
-            ctx.fillRect(-100, 150, 50, 50); ctx.fillRect(50, 150, 50, 50);
-            ctx.fillStyle = "#fff";
-            ctx.font = "20px Serif";
-            ctx.fillText("SANTA'S WORKSHOP", -80, 130);
+            ctx.fillStyle = "#7f1d1d"; ctx.fillRect(-150, 100, 300, 200);
+            ctx.fillStyle = "#fbbf24"; ctx.fillRect(-100, 150, 50, 50); ctx.fillRect(50, 150, 50, 50);
         }
         ctx.restore();
     };
 
     const drawPowerup = (ctx: CanvasRenderingContext2D, p: Powerup) => {
         const color = POWERUP_COLORS[p.type] || '#ffffff';
-        const cx = p.x + p.width/2; 
-        const cy = p.y + p.height/2 + Math.sin(p.floatOffset)*5;
-        
-        ctx.save();
-        ctx.translate(cx, cy);
-        
-        ctx.shadowColor = color; ctx.shadowBlur = 30;
-        ctx.fillStyle = color;
-        
+        const cx = p.x + p.width/2; const cy = p.y + p.height/2 + Math.sin(p.floatOffset)*5;
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.shadowColor = color; ctx.shadowBlur = 25; ctx.fillStyle = color;
         if (p.type === PowerupType.CHRONO_BOOST) {
-            // Gold Star
             ctx.beginPath();
-            for(let i=0; i<5; i++){
-                ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*15, -Math.sin((18+i*72)/180*Math.PI)*15);
-                ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*7, -Math.sin((54+i*72)/180*Math.PI)*7);
-            }
-            ctx.closePath();
-            ctx.fill();
-        } else if (p.type === PowerupType.HULL_REPAIR) {
-            // Heart/Cross
-            ctx.fillRect(-5, -15, 10, 30); ctx.fillRect(-15, -5, 30, 10);
-        } else {
-             ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.fill();
-        }
+            for(let i=0; i<5; i++){ ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*15, -Math.sin((18+i*72)/180*Math.PI)*15); ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*7, -Math.sin((54+i*72)/180*Math.PI)*7); }
+            ctx.closePath(); ctx.fill();
+        } else { ctx.beginPath(); ctx.arc(0,0, 12, 0, Math.PI*2); ctx.fill(); }
         ctx.restore();
     };
 
     const checkCollision = (r1: Entity, r2: Entity) => (r1.x < r2.x + r2.width && r1.x + r1.width > r2.x && r1.y < r2.y + r2.height && r1.y + r1.height > r2.y);
-    
     animId = requestAnimationFrame(render);
-    return () => { 
-        cancelAnimationFrame(animId);
-        soundManager.stopBgm();
-    };
+    return () => { cancelAnimationFrame(animId); soundManager.stopBgm(); };
   }, [gameState]);
 
   return (
-    <div className="relative w-full h-full max-w-[1200px] max-h-[600px] mx-auto border-4 border-yellow-900/50 shadow-[0_0_50px_rgba(251,191,36,0.1)] overflow-hidden bg-[#000000] rounded-lg">
+    <div className="relative w-full h-full max-w-[1200px] max-h-[600px] mx-auto border border-yellow-900/30 shadow-2xl overflow-hidden bg-black rounded-lg">
       <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="w-full h-full" />
       <UIOverlay {...hudState} currentLevelName={LEVELS[hudState.levelIndex].name} currentLevelSub={LEVELS[hudState.levelIndex].subtext} />
     </div>
