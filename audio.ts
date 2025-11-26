@@ -1,5 +1,6 @@
 
 
+
 // Audio Engine for Sleigh Ride 2: Brave New World
 
 export class SoundManager {
@@ -77,12 +78,12 @@ export class SoundManager {
 
   // --- BGM Logic ---
 
-  playLevelBgm(levelIndex: number) {
+  playLevelBgm(trackName: string) {
       let trackKey: string | null = null;
-      if (levelIndex === 0) trackKey = 'sector_1';
-      else if (levelIndex === 1) trackKey = 'sector_2';
-      else if (levelIndex === 2) trackKey = 'sector_3';
-      else if (levelIndex === 3) trackKey = 'sector_4';
+      if (trackName === 'WONDERLAND') trackKey = 'sector_1';
+      else if (trackName === 'GRAY_WORLD') trackKey = 'sector_2';
+      else if (trackName === 'OCEAN') trackKey = 'sector_3';
+      else if (trackName === 'BLIZZARD') trackKey = 'sector_4';
       
       this.transitionBgm(trackKey);
   }

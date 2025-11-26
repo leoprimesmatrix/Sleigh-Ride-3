@@ -46,6 +46,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     { points: [], color: '#000000', speedModifier: 0.6, offset: 0 },  
   ]);
   const matrixRainRef = useRef<{x:number, y:number, speed:number, char:string}[]>([]);
+  const snowRef = useRef<{x:number, y:number, r:number, speed:number, swing:number}[]>([]);
 
   // Logic
   const shakeRef = useRef(0);
@@ -111,7 +112,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             type, 
             x, 
             y, 
-            radius: type === ParticleType.THRUST ? Math.random()*3+1 : Math.random()*3+1, 
+            radius: type === ParticleType.SNOW ? Math.random()*2+1 : Math.random()*3+1, 
             vx: type === ParticleType.THRUST ? -Math.random()*speed - 2 : (Math.random()-0.5)*speed, 
             vy: type === ParticleType.THRUST ? (Math.random()-0.5)*1 : (Math.random()-0.5)*speed, 
             alpha:1, 
@@ -178,6 +179,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         bgLayersRef.current[1].points = genLandscape(100, 80, 200);
         bgLayersRef.current[2].points = genLandscape(100, 40, 100);
         
+        // Matrix Rain
         matrixRainRef.current = [];
         for(let i=0; i<50; i++) {
             matrixRainRef.current.push({
@@ -185,6 +187,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                 y: Math.random() * CANVAS_HEIGHT,
                 speed: Math.random() * 5 + 2,
                 char: Math.random() > 0.5 ? '1' : '0'
+            });
+        }
+        
+        // Festive Snow
+        snowRef.current = [];
+        for(let i=0; i<100; i++) {
+            snowRef.current.push({
+                x: Math.random() * CANVAS_WIDTH,
+                y: Math.random() * CANVAS_HEIGHT,
+                r: Math.random() * 3 + 1,
+                speed: Math.random() * 2 + 1,
+                swing: Math.random() * Math.PI
             });
         }
     }
@@ -297,7 +311,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
       for (let i = LEVELS.length - 1; i >= 0; i--) { if (progressPercent >= LEVEL_THRESHOLDS[i]) { levelIndex = i; break; }}
       
       if (levelIndex !== lastLevelIndexRef.current) {
-          soundManager.playLevelBgm(levelIndex);
+          const l = LEVELS[levelIndex];
+          soundManager.playLevelBgm(l.musicTrack);
           lastLevelIndexRef.current = levelIndex;
       }
       const level = LEVELS[levelIndex] || LEVELS[0];
@@ -343,8 +358,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
               let w = 50; let h = 50;
               let score = 100;
               
-              if (type === 'GLITCH_ELF') {
-                  w = 40; h = 40; score = 200;
+              if (type === 'GLITCH_ELF' || type === 'SNOWMAN') {
+                  w = 40; h = 60; score = 200;
               } else if (type === 'STATIC_CLOUD') {
                   h = 80; w = 120; score = 150;
               } else if (type === 'CLOCKWORK_GEAR') {
@@ -354,6 +369,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
               } else if (type === 'TIME_RIFT') {
                   w = 30; h = 150; score = 500;
                   y = Math.random() * (CANVAS_HEIGHT - h);
+              } else if (type === 'PRESENT_STACK') {
+                  w = 40; h = 80; score = 150;
+                  y = CANVAS_HEIGHT - 120 - Math.random() * 50; // Near ground
+              } else if (type === 'DECORATED_TREE') {
+                  w = 80; h = 120; score = 100;
+                  y = CANVAS_HEIGHT - 150;
+              } else if (type === 'FESTIVE_ARCH') {
+                  w = 50; h = 200; score = 250;
+                  y = Math.random() > 0.5 ? 0 : CANVAS_HEIGHT - 200;
               }
 
               obstaclesRef.current.push({
@@ -476,6 +500,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
           if (Math.random() < 0.1) r.char = Math.random() > 0.5 ? '1' : '0';
       });
 
+      // Snow
+      snowRef.current.forEach(s => {
+          s.y += s.speed * timeScale;
+          s.x += Math.sin(s.swing += 0.05 * timeScale) * 0.5;
+          if (s.y > CANVAS_HEIGHT) s.y = -5;
+          if (s.x > CANVAS_WIDTH) s.x = 0;
+      });
+
       // Cleanup
       obstaclesRef.current = obstaclesRef.current.filter(e => !e.markedForDeletion);
       powerupsRef.current = powerupsRef.current.filter(e => !e.markedForDeletion);
@@ -527,25 +559,39 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         grad.addColorStop(0, level.colors.sky[0]); grad.addColorStop(1, level.colors.sky[1]);
         ctx.fillStyle = grad; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
 
-        // Matrix Rain
-        ctx.save();
-        ctx.fillStyle = level.colors.grid;
-        ctx.font = '10px monospace';
-        ctx.globalAlpha = 0.2;
-        matrixRainRef.current.forEach(r => {
-            ctx.fillText(r.char, r.x, r.y);
-        });
-        ctx.restore();
+        // Matrix Rain (Opacity depends on glitch intensity)
+        if (level.glitchIntensity > 0) {
+            ctx.save();
+            ctx.fillStyle = level.colors.grid;
+            ctx.font = '10px monospace';
+            ctx.globalAlpha = 0.2 * level.glitchIntensity;
+            matrixRainRef.current.forEach(r => {
+                ctx.fillText(r.char, r.x, r.y);
+            });
+            ctx.restore();
+        }
+
+        // Snow (Only in early levels or as "glitch snow" later)
+        if (level.glitchIntensity < 0.5) {
+            ctx.save();
+            ctx.fillStyle = "white";
+            ctx.globalAlpha = 0.6;
+            snowRef.current.forEach(s => {
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.restore();
+        }
 
         // 2. Grid Floor
         drawGrid(ctx, level.colors.grid, 0.5);
 
-        // 3. Parallax Landscape (Glitch Mountains)
+        // 3. Parallax Landscape
         bgLayersRef.current.forEach((layer, i) => {
             ctx.save();
-            ctx.fillStyle = layer.color; // Using black mostly now
+            ctx.fillStyle = level.colors.ground; 
+            // Darken further back layers
+            if (i > 0) ctx.globalAlpha = 0.7 - i*0.2;
             
-            // Only draw for layers with points
             if (layer.points.length > 0) {
                 const blockWidth = 50 + i * 30; 
                 const points = layer.points as any[];
@@ -562,8 +608,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                     if (!b) continue;
                     
                     let h = b.height;
-                    // Glitch effect on mountains
-                    if (Math.random() < 0.01) h += Math.random() * 50 - 25;
+                    // Glitch effect on terrain in later levels
+                    if (level.glitchIntensity > 0.5 && Math.random() < 0.05) h += Math.random() * 50 - 25;
 
                     const x = j * blockWidth - offset;
                     ctx.lineTo(x, CANVAS_HEIGHT - h);
@@ -571,11 +617,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                 }
                 ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
                 ctx.fill();
-                
-                // Neon outline
-                ctx.strokeStyle = level.colors.grid;
-                ctx.lineWidth = 1;
-                ctx.stroke();
             }
             ctx.restore();
         });
@@ -598,9 +639,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
 
         // Vignette & Scanlines
         ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.1)";
-        for(let y=0; y<CANVAS_HEIGHT; y+=2) {
-            ctx.fillRect(0, y, CANVAS_WIDTH, 1);
+        // Vignette gets stronger in glitch levels
+        const vigIntensity = 0.1 + (level.glitchIntensity * 0.4);
+        ctx.fillStyle = `rgba(0,0,0,${vigIntensity})`;
+        
+        // Scanlines only in glitch levels
+        if (level.glitchIntensity > 0.2) {
+             for(let y=0; y<CANVAS_HEIGHT; y+=4) {
+                ctx.fillRect(0, y, CANVAS_WIDTH, 1);
+            }
         }
         ctx.restore();
     };
@@ -675,9 +722,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.fill();
         }
 
-        // Reindeer (Simplified holographic projections maybe?)
-        ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = 0.4;
-        ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(70, 0); ctx.stroke();
+        // Reindeer 
+        ctx.strokeStyle = "#ffffff"; ctx.globalAlpha = 0.6;
+        ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(70, -10); ctx.stroke();
+        
+        // Simple Reindeer graphic
+        ctx.fillStyle = "#78350f"; // Brown
+        ctx.beginPath(); ctx.ellipse(80, -5, 15, 8, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#ef4444"; // Red nose
+        ctx.beginPath(); ctx.arc(95, -5, 3, 0, Math.PI*2); ctx.fill();
+
 
         ctx.restore();
     };
@@ -693,7 +747,36 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             return;
         }
 
-        if (o.type === 'CLOCKWORK_GEAR') {
+        // --- FESTIVE OBSTACLES ---
+        if (o.type === 'SNOWMAN') {
+             ctx.fillStyle = "#fff";
+             ctx.beginPath(); ctx.arc(0, 15, 20, 0, Math.PI*2); ctx.fill(); // Base
+             ctx.beginPath(); ctx.arc(0, -10, 15, 0, Math.PI*2); ctx.fill(); // Head
+             ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(10,-8); ctx.lineTo(0,-6); ctx.fill(); // Nose
+             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -8, 30, 4); // Scarf
+        } 
+        else if (o.type === 'PRESENT_STACK') {
+             ctx.fillStyle = "#16a34a"; ctx.fillRect(-20, -10, 40, 40); // Bottom
+             ctx.fillStyle = "#ef4444"; ctx.fillRect(-15, -35, 30, 25); // Top
+             ctx.fillStyle = "#fbbf24"; ctx.fillRect(-5, -35, 10, 65); // Ribbon
+        }
+        else if (o.type === 'DECORATED_TREE') {
+             ctx.fillStyle = "#14532d"; 
+             ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(30, 50); ctx.lineTo(-30, 50); ctx.fill();
+             // Ornaments
+             ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(-10, 0, 4, 0, Math.PI*2); ctx.fill();
+             ctx.fillStyle = "#fbbf24"; ctx.beginPath(); ctx.arc(10, 20, 4, 0, Math.PI*2); ctx.fill();
+             ctx.fillStyle = "#3b82f6"; ctx.beginPath(); ctx.arc(5, -20, 4, 0, Math.PI*2); ctx.fill();
+        }
+        else if (o.type === 'FESTIVE_ARCH') {
+            ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 10;
+            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.setLineDash([10, 10]);
+            ctx.beginPath(); ctx.arc(0, 50, 40, Math.PI, 0); ctx.stroke();
+        }
+
+        // --- GLITCH OBSTACLES ---
+        else if (o.type === 'CLOCKWORK_GEAR') {
              ctx.rotate(o.rotation || 0);
              ctx.fillStyle = "#b45309"; // Bronze
              ctx.beginPath();
@@ -711,7 +794,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
              ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(0,0, holeRadius, 0, Math.PI*2); ctx.fill();
 
         } else if (o.type === 'TIME_RIFT') {
-             // Purple crack
              const h = o.height;
              ctx.shadowColor = "#a855f7"; ctx.shadowBlur = 20;
              ctx.strokeStyle = "#d8b4fe"; ctx.lineWidth = 3;
@@ -727,14 +809,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.fillStyle = "#1e293b";
             ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = "#ef4444"; ctx.shadowColor="#ef4444"; ctx.shadowBlur=10;
-            ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill(); // Red Eye
+            ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill(); 
 
         } else if (o.type === 'GLITCH_ELF') {
-            // Distorted Elf
             ctx.rotate(o.rotation || 0);
             ctx.fillStyle = Math.random() > 0.5 ? "#166534" : "#ff00ff"; // Flashing color
             ctx.fillRect(-15, -15, 30, 30);
-            // Glitch rects
             ctx.fillStyle = "#000";
             ctx.fillRect(Math.random()*20 - 10, Math.random()*20 - 10, 10, 2);
 
@@ -756,7 +836,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
             const t = Date.now() / 1000;
             ctx.rotate(t);
-            // Spiral
             ctx.beginPath();
             for (let i = 0; i < 100; i++) {
               const angle = 0.1 * i;
@@ -767,25 +846,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.stroke();
             
         } else if (lm.type === 'CLOCK_TOWER') {
-            ctx.fillStyle = "#1e1b4b"; // Dark Indigo
+            ctx.fillStyle = "#1e1b4b"; 
             ctx.fillRect(-40, 0, 80, 400);
-            // Clock Face
             ctx.fillStyle = "#fff"; ctx.shadowColor="#fff"; ctx.shadowBlur=20;
             ctx.beginPath(); ctx.arc(0, 50, 30, 0, Math.PI*2); ctx.fill();
-            // Hands
             ctx.strokeStyle = "#000"; ctx.lineWidth=3;
             ctx.beginPath(); ctx.moveTo(0,50); ctx.lineTo(0, 30); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0,50); ctx.lineTo(15, 50); ctx.stroke();
 
-        } else if (lm.type === 'NEON_FACTORY') {
-            ctx.fillStyle = "#020617";
-            ctx.strokeStyle = "#06b6d4"; ctx.lineWidth = 2;
+        } else if (lm.type === 'GRAND_TREE') {
+            // Big Christmas Tree
+            ctx.fillStyle = "#064e3b";
+            ctx.beginPath(); ctx.moveTo(0,-200); ctx.lineTo(100, 300); ctx.lineTo(-100, 300); ctx.fill();
+            // Star
+            ctx.fillStyle = "#facc15"; ctx.shadowColor="#facc15"; ctx.shadowBlur=30;
+            ctx.beginPath(); ctx.arc(0, -200, 20, 0, Math.PI*2); ctx.fill();
+
+        } else if (lm.type === 'TOY_WORKSHOP') {
+            ctx.fillStyle = "#7f1d1d";
             ctx.fillRect(-150, 100, 300, 200);
-            ctx.strokeRect(-150, 100, 300, 200);
-            // Neon sign
-            ctx.fillStyle = "#06b6d4";
-            ctx.font = "20px Orbitron";
-            ctx.fillText("SANTA_CORP", -80, 150);
+            ctx.fillStyle = "#fbbf24"; // Windows
+            ctx.fillRect(-100, 150, 50, 50); ctx.fillRect(50, 150, 50, 50);
+            ctx.fillStyle = "#fff";
+            ctx.font = "20px Serif";
+            ctx.fillText("SANTA'S WORKSHOP", -80, 130);
         }
         ctx.restore();
     };
@@ -802,10 +886,16 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         ctx.fillStyle = color;
         
         if (p.type === PowerupType.CHRONO_BOOST) {
-            // Hourglass shape
-            ctx.beginPath(); ctx.moveTo(-10,-10); ctx.lineTo(10,-10); ctx.lineTo(0,0); ctx.lineTo(10,10); ctx.lineTo(-10,10); ctx.lineTo(0,0); ctx.fill();
+            // Gold Star
+            ctx.beginPath();
+            for(let i=0; i<5; i++){
+                ctx.lineTo(Math.cos((18+i*72)/180*Math.PI)*15, -Math.sin((18+i*72)/180*Math.PI)*15);
+                ctx.lineTo(Math.cos((54+i*72)/180*Math.PI)*7, -Math.sin((54+i*72)/180*Math.PI)*7);
+            }
+            ctx.closePath();
+            ctx.fill();
         } else if (p.type === PowerupType.HULL_REPAIR) {
-            // Cross
+            // Heart/Cross
             ctx.fillRect(-5, -15, 10, 30); ctx.fillRect(-15, -5, 30, 10);
         } else {
              ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.fill();
@@ -823,11 +913,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   }, [gameState]);
 
   return (
-    <div className="relative w-full h-full max-w-[1200px] max-h-[600px] mx-auto border-4 border-red-900/50 shadow-[0_0_50px_rgba(220,38,38,0.2)] overflow-hidden bg-[#000000] rounded-lg">
+    <div className="relative w-full h-full max-w-[1200px] max-h-[600px] mx-auto border-4 border-yellow-900/50 shadow-[0_0_50px_rgba(251,191,36,0.1)] overflow-hidden bg-[#000000] rounded-lg">
       <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="w-full h-full" />
       <UIOverlay {...hudState} currentLevelName={LEVELS[hudState.levelIndex].name} currentLevelSub={LEVELS[hudState.levelIndex].subtext} />
-      {/* Scanlines Overlay */}
-      <div className="absolute inset-0 pointer-events-none z-10" style={{ background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px)' }}></div>
     </div>
   );
 };

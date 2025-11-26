@@ -44,7 +44,9 @@ export interface Player extends Entity {
   comboTimer: number;
 }
 
-export type ObstacleType = 'CLOCKWORK_GEAR' | 'TIME_RIFT' | 'GLITCH_ELF' | 'STATIC_CLOUD' | 'DRONE_SENTINEL';
+export type ObstacleType = 
+    'SNOWMAN' | 'PRESENT_STACK' | 'DECORATED_TREE' | 'FESTIVE_ARCH' |
+    'CLOCKWORK_GEAR' | 'TIME_RIFT' | 'GLITCH_ELF' | 'STATIC_CLOUD' | 'DRONE_SENTINEL';
 
 export interface Obstacle extends Entity {
   type: ObstacleType;
@@ -64,7 +66,7 @@ export interface ScorePopup {
 }
 
 export interface Landmark extends Entity {
-  type: 'CLOCK_TOWER' | 'NEON_FACTORY' | 'TIME_VORTEX';
+  type: 'GRAND_TREE' | 'TOY_WORKSHOP' | 'CLOCK_TOWER' | 'NEON_FACTORY' | 'TIME_VORTEX';
   name: string;
 }
 
@@ -79,6 +81,7 @@ export interface DataLog extends Entity {
 }
 
 export enum ParticleType {
+  SNOW,       // Gentle white snow
   SPARK,      // Mechanical sparks
   GLITCH,     // Digital squares
   GEAR,       // Small gear bits
@@ -99,6 +102,7 @@ export interface Particle {
   color: string;
   life: number;
   maxLife: number;
+  rotation?: number;
 }
 
 export interface LevelConfig {
@@ -113,6 +117,8 @@ export interface LevelConfig {
   obstacleSpeed: number;
   spawnRate: number;
   allowedObstacles: ObstacleType[];
+  musicTrack: 'WONDERLAND' | 'GRAY_WORLD' | 'OCEAN' | 'BLIZZARD';
+  glitchIntensity: number; // 0 to 1
 }
 
 export interface BackgroundLayer {
@@ -124,9 +130,10 @@ export interface BackgroundLayer {
 
 export interface DialogueLine {
   id: string;
-  speaker: 'SANTA' | 'TIMEKEEPER' | 'SYSTEM';
+  speaker: 'SANTA' | 'ELF_COMM' | 'TIMEKEEPER' | 'SYSTEM';
   text: string;
   color: string;
+  font?: string; // Optional font override
 }
 
 export type DebugCommand = 'SKIP_TO_ENDING' | 'TOGGLE_GOD_MODE' | 'INCREASE_SPEED' | 'TOGGLE_HYPER_PROGRESS' | null;
