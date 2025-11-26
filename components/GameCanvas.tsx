@@ -156,7 +156,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                 points.push({ height: h, isBuilding: false, hasWindows: false });
             }
         } else if (type === 'CITY') {
-            // City generation: blocks of heights
             let currentHeight = 150;
             let widthLeft = 0;
             let isGap = false;
@@ -165,10 +164,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                 if (widthLeft <= 0) {
                     isGap = Math.random() > 0.7; // 30% chance of gap
                     if (isGap) {
-                        currentHeight = 50; // Low ground
+                        currentHeight = 50; 
                         widthLeft = Math.floor(Math.random() * 5) + 2;
                     } else {
-                        currentHeight = 150 + Math.random() * 150; // Tall building
+                        currentHeight = 150 + Math.random() * 150;
                         widthLeft = Math.floor(Math.random() * 8) + 4;
                     }
                 }
@@ -180,7 +179,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
                 widthLeft--;
             }
         } else {
-            // Hills (Smooth)
             h = 50;
             for(let i=0; i<count; i++) {
                 h += (Math.random() - 0.5) * 15;
@@ -477,40 +475,38 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
 
     const drawBackgroundLayers = (ctx: CanvasRenderingContext2D, level: typeof LEVELS[0]) => {
         bgLayersRef.current.forEach((layer, i) => {
+            if (layer.points.length === 0) return;
+
             ctx.save();
             
-            // Choose color based on type
             if (layer.type === 'MOUNTAINS') ctx.fillStyle = level.colors.mountains;
             else if (layer.type === 'CITY') ctx.fillStyle = level.colors.city;
             else ctx.fillStyle = level.colors.ground;
 
-            // Parallax Scroll calculation
             const blockWidth = 50;
-            const points = layer.points;
-            if (points.length === 0) return;
-
-            const scrollPos = (distanceRef.current * layer.speedModifier) % (points.length * blockWidth);
+            const scrollPos = (distanceRef.current * layer.speedModifier) % (layer.points.length * blockWidth);
             const startIndex = Math.floor(scrollPos / blockWidth);
             const offset = scrollPos % blockWidth;
 
+            // Draw Terrain/Silhouettes
             ctx.beginPath();
-            ctx.moveTo(-blockWidth, CANVAS_HEIGHT); // Start bottom-left offscreen
+            ctx.moveTo(-blockWidth, CANVAS_HEIGHT); 
 
-            for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
-                const idx = (startIndex + j) % points.length;
-                const point = points[idx];
+            // Optimization: Draw slightly more than screen width to avoid popping
+            const numBlocks = Math.ceil(CANVAS_WIDTH / blockWidth) + 2;
+
+            for (let j = 0; j < numBlocks; j++) {
+                const idx = (startIndex + j) % layer.points.length;
+                const point = layer.points[idx];
                 const x = j * blockWidth - offset;
                 const nextX = (j + 1) * blockWidth - offset;
 
                 if (layer.type === 'CITY') {
-                    // Step function for buildings
                     ctx.lineTo(x, CANVAS_HEIGHT - point.height);
                     ctx.lineTo(nextX, CANVAS_HEIGHT - point.height);
                 } else if (layer.type === 'MOUNTAINS') {
-                     // Jagged peaks
                      ctx.lineTo(x + blockWidth/2, CANVAS_HEIGHT - point.height);
                 } else {
-                     // Smooth hills
                      ctx.lineTo(x, CANVAS_HEIGHT - point.height);
                 }
             }
@@ -519,38 +515,37 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.closePath();
             ctx.fill();
 
-            // Draw Windows for City Layer
+            // Draw Windows (Optimized Batching)
             if (layer.type === 'CITY') {
-                ctx.fillStyle = level.glitchIntensity > 0.5 ? '#ef4444' : '#fbbf24'; // Red if glitch, Gold if normal
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.shadowBlur = level.glitchIntensity > 0.5 ? 5 : 10;
+                ctx.fillStyle = level.glitchIntensity > 0.5 ? '#ef4444' : '#fbbf24'; 
+                // REMOVED SHADOW BLUR FOR PERFORMANCE
                 
-                for (let j = 0; j < Math.ceil(CANVAS_WIDTH / blockWidth) + 2; j++) {
-                    const idx = (startIndex + j) % points.length;
-                    const point = points[idx];
+                ctx.beginPath(); // Batch all windows into one path
+                for (let j = 0; j < numBlocks; j++) {
+                    const idx = (startIndex + j) % layer.points.length;
+                    const point = layer.points[idx];
                     
                     if (point.isBuilding && point.hasWindows) {
                          const x = j * blockWidth - offset;
                          const h = point.height;
-                         
-                         // Simple grid of windows
                          const rows = Math.floor(h / 30);
                          const cols = 2; 
-                         
-                         // Flickering logic
-                         if (Math.random() > 0.95) continue; 
+
+                         // Flickering logic: 5% chance to be OFF (skip)
+                         if (Math.random() < 0.05) continue; 
 
                          for(let r=1; r<rows; r++) {
                              for(let c=0; c<cols; c++) {
                                  const wx = x + 10 + c * 20;
                                  const wy = CANVAS_HEIGHT - h + 10 + r * 25;
                                  if (wy < CANVAS_HEIGHT - 10) {
-                                     ctx.fillRect(wx, wy, 8, 12);
+                                     ctx.rect(wx, wy, 8, 12);
                                  }
                              }
                          }
                     }
                 }
+                ctx.fill();
             }
 
             ctx.restore();
