@@ -53,6 +53,8 @@ export interface Obstacle extends Entity {
   rotation?: number;
   scoreValue: number;
   stabilized: boolean; // Has the player "slipped" through it?
+  oscillationOffset?: number; // For moving enemies
+  baseY?: number;
 }
 
 export interface ScorePopup {
@@ -105,14 +107,17 @@ export interface Particle {
   rotation?: number;
 }
 
+export type LevelTheme = 'CHRISTMAS_VILLAGE' | 'CANDY_FOREST' | 'FACTORY_DISTRICT' | 'GLITCH_WASTELAND' | 'DIGITAL_VOID';
+
 export interface LevelConfig {
   name: string;
   subtext: string;
+  theme: LevelTheme;
   colors: {
     sky: [string, string];
     ground: string;
     mountains: string;
-    city: string;
+    midground: string; // Used for buildings/trees
     fog: string;
     grid: string; 
     aurora: [string, string]; // Top/Bottom colors
@@ -126,16 +131,15 @@ export interface LevelConfig {
 
 export interface BackgroundPoint {
     height: number;
-    isBuilding: boolean;
-    hasWindows: boolean;
+    type: 'BUILDING' | 'TREE' | 'FACTORY' | 'SHARD' | 'NONE'; // Specific shape metadata
+    widthMod: number; // Random width variation
 }
 
 export interface BackgroundLayer {
   points: BackgroundPoint[];
-  color: string;
   speedModifier: number;
   offset: number;
-  type: 'MOUNTAINS' | 'CITY' | 'HILLS';
+  layerType: 'FAR' | 'MID' | 'NEAR'; 
 }
 
 export interface DialogueLine {

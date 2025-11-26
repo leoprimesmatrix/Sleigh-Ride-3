@@ -40,9 +40,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
   
   // Visuals
   const bgLayersRef = useRef<BackgroundLayer[]>([
-    { points: [], color: '#000000', speedModifier: 0.1, offset: 0, type: 'MOUNTAINS' }, 
-    { points: [], color: '#000000', speedModifier: 0.3, offset: 0, type: 'CITY' },  
-    { points: [], color: '#000000', speedModifier: 0.8, offset: 0, type: 'HILLS' },  
+    { points: [], speedModifier: 0.1, offset: 0, layerType: 'FAR' }, 
+    { points: [], speedModifier: 0.4, offset: 0, layerType: 'MID' },  
+    { points: [], speedModifier: 0.8, offset: 0, layerType: 'NEAR' },  
   ]);
   const starsRef = useRef<{x:number, y:number, size:number, opacity:number}[]>([]);
   const snowRef = useRef<{x:number, y:number, r:number, speed:number, swing:number}[]>([]);
@@ -144,55 +144,47 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
     if (gameState !== GameState.PLAYING && gameState !== GameState.INTRO) return;
 
     // --- Background Generation ---
-    const generateBackgroundSegment = (type: 'MOUNTAINS' | 'CITY' | 'HILLS', count: number): BackgroundPoint[] => {
+    const generateBackgroundSegment = (layerType: 'FAR' | 'MID' | 'NEAR', count: number): BackgroundPoint[] => {
         const points: BackgroundPoint[] = [];
         let h = 0;
         
-        if (type === 'MOUNTAINS') {
-            h = 200;
+        if (layerType === 'FAR') {
+            h = 250;
             for(let i=0; i<count; i++) {
-                h += (Math.random() - 0.5) * 50;
-                h = Math.max(100, Math.min(350, h));
-                points.push({ height: h, isBuilding: false, hasWindows: false });
+                h += (Math.random() - 0.5) * 40;
+                h = Math.max(150, Math.min(350, h));
+                points.push({ height: h, type: 'NONE', widthMod: 1 });
             }
-        } else if (type === 'CITY') {
-            let currentHeight = 150;
-            let widthLeft = 0;
-            let isGap = false;
-            
+        } else if (layerType === 'MID') {
             for(let i=0; i<count; i++) {
-                if (widthLeft <= 0) {
-                    isGap = Math.random() > 0.7; // 30% chance of gap
-                    if (isGap) {
-                        currentHeight = 50; 
-                        widthLeft = Math.floor(Math.random() * 5) + 2;
-                    } else {
-                        currentHeight = 150 + Math.random() * 150;
-                        widthLeft = Math.floor(Math.random() * 8) + 4;
-                    }
+                const isStructure = Math.random() > 0.4; // 60% chance of structure
+                let type: BackgroundPoint['type'] = 'NONE';
+                let height = 100;
+                let widthMod = 1;
+                
+                if (isStructure) {
+                    type = 'BUILDING';
+                    height = 100 + Math.random() * 150;
+                    widthMod = 0.8 + Math.random() * 0.4;
                 }
-                points.push({ 
-                    height: currentHeight, 
-                    isBuilding: !isGap, 
-                    hasWindows: !isGap && Math.random() > 0.1 
-                });
-                widthLeft--;
+
+                points.push({ height, type, widthMod });
             }
         } else {
             h = 50;
             for(let i=0; i<count; i++) {
                 h += (Math.random() - 0.5) * 15;
                 h = Math.max(20, Math.min(100, h));
-                points.push({ height: h, isBuilding: false, hasWindows: false });
+                points.push({ height: h, type: 'NONE', widthMod: 1 });
             }
         }
         return points;
     };
 
     if (bgLayersRef.current[0].points.length === 0) {
-        bgLayersRef.current[0].points = generateBackgroundSegment('MOUNTAINS', 150);
-        bgLayersRef.current[1].points = generateBackgroundSegment('CITY', 150);
-        bgLayersRef.current[2].points = generateBackgroundSegment('HILLS', 150);
+        bgLayersRef.current[0].points = generateBackgroundSegment('FAR', 200);
+        bgLayersRef.current[1].points = generateBackgroundSegment('MID', 200);
+        bgLayersRef.current[2].points = generateBackgroundSegment('NEAR', 200);
         
         snowRef.current = [];
         for(let i=0; i<200; i++) {
@@ -336,17 +328,19 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
               const type = level.allowedObstacles[Math.floor(Math.random() * level.allowedObstacles.length)];
               let y = Math.random() * (CANVAS_HEIGHT - 100);
               let w = 50, h = 50, score = 100;
+              let oscillationOffset = 0;
               
               if (['GLITCH_ELF','SNOWMAN'].includes(type)) { w=40; h=60; score=200; }
               else if (type === 'STATIC_CLOUD') { h=80; w=120; score=150; }
               else if (type === 'TIME_RIFT') { w=30; h=150; score=500; y = Math.random()*(CANVAS_HEIGHT-h); }
               else if (type === 'DECORATED_TREE') { w=80; h=120; score=100; y = CANVAS_HEIGHT-150; }
               else if (type === 'FESTIVE_ARCH') { w=50; h=200; score=250; y = Math.random()>0.5 ? 0 : CANVAS_HEIGHT-200; }
+              else if (type === 'DRONE_SENTINEL') { w=40; h=40; score=300; oscillationOffset = Math.random() * Math.PI * 2; y = CANVAS_HEIGHT/2; }
 
               obstaclesRef.current.push({
                   id: Date.now(), x: CANVAS_WIDTH + 50, y, width: w, height: h,
                   type, markedForDeletion: false, rotation: Math.random() * Math.PI * 2,
-                  scoreValue: score, stabilized: false
+                  scoreValue: score, stabilized: false, oscillationOffset, baseY: y
               });
           }
           if (Math.random() < 0.005 * timeScale) {
@@ -381,8 +375,14 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
       obstaclesRef.current.forEach(obs => {
           obs.x -= currentSpeed * level.obstacleSpeed * timeScale;
           if (obs.x < -100) obs.markedForDeletion = true;
+          
           if (['CLOCKWORK_GEAR','GLITCH_ELF'].includes(obs.type)) obs.rotation! += 0.05 * timeScale;
-          if (obs.type === 'DRONE_SENTINEL') obs.y += (player.y - obs.y) * 0.02 * timeScale;
+          
+          // Dynamic Movements
+          if (obs.type === 'DRONE_SENTINEL') {
+              // Sine wave movement
+              obs.y = (obs.baseY || 300) + Math.sin((now * 0.003) + (obs.oscillationOffset || 0)) * 100;
+          }
 
           if (!obs.markedForDeletion && checkCollision(player, obs)) {
               if (player.isTimeSlipping || player.godMode) {
@@ -440,13 +440,12 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
 
     const drawAurora = (ctx: CanvasRenderingContext2D, colors: [string, string], intensity: number, time: number) => {
         ctx.save();
-        ctx.globalAlpha = 0.6 * (1 - intensity * 0.5); // Fades a bit if glitchy
+        ctx.globalAlpha = 0.6 * (1 - intensity * 0.5); 
         const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT / 2);
         grad.addColorStop(0, colors[0]);
         grad.addColorStop(1, 'transparent');
         ctx.fillStyle = grad;
 
-        // Draw flowing curves
         ctx.beginPath();
         ctx.moveTo(0, 100);
         for (let i = 0; i <= CANVAS_WIDTH; i += 50) {
@@ -456,20 +455,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         ctx.lineTo(CANVAS_WIDTH, 0);
         ctx.lineTo(0, 0);
         ctx.fill();
-
-        // Second Layer
-        ctx.globalAlpha = 0.3;
-        ctx.beginPath();
-        ctx.moveTo(0, 50);
-        for (let i = 0; i <= CANVAS_WIDTH; i += 60) {
-            const y = 80 + Math.cos(i * 0.004 - time * 0.001) * 60;
-            ctx.lineTo(i, y);
-        }
-        ctx.lineTo(CANVAS_WIDTH, 0);
-        ctx.lineTo(0, 0);
-        ctx.fillStyle = colors[1];
-        ctx.fill();
-
         ctx.restore();
     };
 
@@ -478,73 +463,106 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             if (layer.points.length === 0) return;
 
             ctx.save();
-            
-            if (layer.type === 'MOUNTAINS') ctx.fillStyle = level.colors.mountains;
-            else if (layer.type === 'CITY') ctx.fillStyle = level.colors.city;
-            else ctx.fillStyle = level.colors.ground;
-
             const blockWidth = 50;
             const scrollPos = (distanceRef.current * layer.speedModifier) % (layer.points.length * blockWidth);
             const startIndex = Math.floor(scrollPos / blockWidth);
             const offset = scrollPos % blockWidth;
-
-            // Draw Terrain/Silhouettes
-            ctx.beginPath();
-            ctx.moveTo(-blockWidth, CANVAS_HEIGHT); 
-
-            // Optimization: Draw slightly more than screen width to avoid popping
             const numBlocks = Math.ceil(CANVAS_WIDTH / blockWidth) + 2;
 
-            for (let j = 0; j < numBlocks; j++) {
-                const idx = (startIndex + j) % layer.points.length;
-                const point = layer.points[idx];
-                const x = j * blockWidth - offset;
-                const nextX = (j + 1) * blockWidth - offset;
-
-                if (layer.type === 'CITY') {
-                    ctx.lineTo(x, CANVAS_HEIGHT - point.height);
-                    ctx.lineTo(nextX, CANVAS_HEIGHT - point.height);
-                } else if (layer.type === 'MOUNTAINS') {
-                     ctx.lineTo(x + blockWidth/2, CANVAS_HEIGHT - point.height);
-                } else {
-                     ctx.lineTo(x, CANVAS_HEIGHT - point.height);
-                }
-            }
-
-            ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
-            ctx.closePath();
-            ctx.fill();
-
-            // Draw Windows (Optimized Batching)
-            if (layer.type === 'CITY') {
-                ctx.fillStyle = level.glitchIntensity > 0.5 ? '#ef4444' : '#fbbf24'; 
-                // REMOVED SHADOW BLUR FOR PERFORMANCE
-                
-                ctx.beginPath(); // Batch all windows into one path
+            if (layer.layerType === 'FAR') {
+                // Mountains/Skyline
+                ctx.fillStyle = level.colors.mountains;
+                ctx.beginPath();
+                ctx.moveTo(-blockWidth, CANVAS_HEIGHT);
                 for (let j = 0; j < numBlocks; j++) {
                     const idx = (startIndex + j) % layer.points.length;
                     const point = layer.points[idx];
+                    const x = j * blockWidth - offset;
+                    ctx.lineTo(x + blockWidth/2, CANVAS_HEIGHT - point.height);
+                }
+                ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
+                ctx.fill();
+
+            } else if (layer.layerType === 'MID') {
+                // BIOME SPECIFIC RENDERING
+                ctx.fillStyle = level.colors.midground;
+                
+                // Batch buildings
+                ctx.beginPath();
+                
+                for (let j = 0; j < numBlocks; j++) {
+                    const idx = (startIndex + j) % layer.points.length;
+                    const point = layer.points[idx];
+                    const x = j * blockWidth - offset;
                     
-                    if (point.isBuilding && point.hasWindows) {
-                         const x = j * blockWidth - offset;
+                    if (point.type !== 'NONE') {
+                         const w = blockWidth * point.widthMod;
                          const h = point.height;
-                         const rows = Math.floor(h / 30);
-                         const cols = 2; 
+                         const bx = x + (blockWidth - w)/2;
+                         const by = CANVAS_HEIGHT - h;
 
-                         // Flickering logic: 5% chance to be OFF (skip)
-                         if (Math.random() < 0.05) continue; 
-
-                         for(let r=1; r<rows; r++) {
-                             for(let c=0; c<cols; c++) {
-                                 const wx = x + 10 + c * 20;
-                                 const wy = CANVAS_HEIGHT - h + 10 + r * 25;
-                                 if (wy < CANVAS_HEIGHT - 10) {
-                                     ctx.rect(wx, wy, 8, 12);
-                                 }
-                             }
+                         // Shape Logic based on Theme
+                         if (level.theme === 'CHRISTMAS_VILLAGE' && point.type === 'BUILDING') {
+                             // House body
+                             ctx.rect(bx, by, w, h);
+                             // Roof (drawing in separate loop would be cleaner but this is fast enough)
+                             ctx.moveTo(bx, by);
+                             ctx.lineTo(bx + w/2, by - 20);
+                             ctx.lineTo(bx + w, by);
+                         } else if (level.theme === 'FACTORY_DISTRICT' && point.type === 'BUILDING') {
+                             // Factory
+                             ctx.rect(bx, by, w, h);
+                             // Smokestack
+                             ctx.rect(bx + w - 10, by - 40, 8, 40);
+                         } else if (level.theme === 'GLITCH_WASTELAND' && point.type === 'BUILDING') {
+                             // Floating shards
+                             ctx.rect(bx, by - 50, w, h * 0.5);
+                             ctx.rect(bx + 10, by, w * 0.5, h * 0.3);
+                         } else if (level.theme === 'DIGITAL_VOID' && point.type === 'BUILDING') {
+                             // Pillars
+                             ctx.rect(bx + 5, by, w - 10, h);
+                         } else {
+                             // Fallback
+                             ctx.rect(bx, by, w, h);
                          }
                     }
                 }
+                ctx.fill();
+
+                // Details (Windows/Lights) - Batched
+                if (level.theme === 'CHRISTMAS_VILLAGE' || level.theme === 'FACTORY_DISTRICT') {
+                    ctx.fillStyle = level.theme === 'CHRISTMAS_VILLAGE' ? '#fbbf24' : '#ef4444';
+                    ctx.beginPath();
+                    for (let j = 0; j < numBlocks; j++) {
+                        const idx = (startIndex + j) % layer.points.length;
+                        const point = layer.points[idx];
+                        if (point.type !== 'NONE' && Math.random() > 0.3) {
+                             const x = j * blockWidth - offset;
+                             const w = blockWidth * point.widthMod;
+                             const bx = x + (blockWidth - w)/2;
+                             const by = CANVAS_HEIGHT - point.height;
+                             if (level.theme === 'CHRISTMAS_VILLAGE') {
+                                 ctx.rect(bx + w/2 - 5, by + 20, 10, 10); // Window
+                             } else {
+                                 ctx.rect(bx + 5, by + 10, w-10, 2); // Factory slit
+                             }
+                        }
+                    }
+                    ctx.fill();
+                }
+
+            } else {
+                // Near ground (Snow)
+                ctx.fillStyle = level.colors.ground;
+                ctx.beginPath();
+                ctx.moveTo(-blockWidth, CANVAS_HEIGHT);
+                for (let j = 0; j < numBlocks; j++) {
+                    const idx = (startIndex + j) % layer.points.length;
+                    const point = layer.points[idx];
+                    const x = j * blockWidth - offset;
+                    ctx.lineTo(x, CANVAS_HEIGHT - point.height);
+                }
+                ctx.lineTo(CANVAS_WIDTH + blockWidth, CANVAS_HEIGHT);
                 ctx.fill();
             }
 
@@ -560,7 +578,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
         const perspective = 0.5;
         const offset = (distanceRef.current * 0.5) % 50;
         ctx.beginPath();
-        // Floor Grid only
         for(let i=-200; i<CANVAS_WIDTH+200; i+=100) {
             const x = i - offset;
             ctx.moveTo(x, CANVAS_HEIGHT/2); // Horizon
@@ -773,6 +790,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, setGameState, onWin,
             ctx.fillStyle = "#0f172a"; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = "#ef4444"; ctx.shadowColor="#ef4444"; ctx.shadowBlur=15;
             ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill(); 
+            // Eye
+            ctx.fillStyle = "#fff"; ctx.fillRect(-2, -2, 4, 4);
         } else if (o.type === 'GLITCH_ELF') {
             ctx.rotate(o.rotation || 0);
             ctx.fillStyle = Math.random() > 0.5 ? "#166534" : "#ff00ff";

@@ -8,15 +8,15 @@ export const CANVAS_HEIGHT = 600;
 export const GRAVITY = 0.25; 
 export const THRUST_POWER = -0.55; 
 export const MAX_FALL_SPEED = 9;
-export const BASE_SPEED = 10; 
+export const BASE_SPEED = 12; // Increased slightly for better pacing
 
 // Time Slip Mechanic
-export const STABILITY_DRAIN_RATE = 35; 
-export const STABILITY_RECHARGE_RATE = 10; 
-export const STABILITY_MIN_ACTIVATION = 15; 
-export const STABILITY_RESTORE_REWARD = 25; 
+export const STABILITY_DRAIN_RATE = 30; // Slightly more forgiving
+export const STABILITY_RECHARGE_RATE = 12; 
+export const STABILITY_MIN_ACTIVATION = 10; 
+export const STABILITY_RESTORE_REWARD = 20; 
 
-export const COMBO_DECAY = 3.0; 
+export const COMBO_DECAY = 3.5; 
 
 export const POWERUP_COLORS: Record<PowerupType, string> = {
   [PowerupType.CHRONO_BOOST]: '#fbbf24',    // Gold
@@ -25,23 +25,24 @@ export const POWERUP_COLORS: Record<PowerupType, string> = {
   [PowerupType.TIME_FREEZE]: '#a855f7',     // Royal Purple
 };
 
-export const LEVEL_THRESHOLDS = [0, 25, 50, 75, 96];
+export const LEVEL_THRESHOLDS = [0, 20, 45, 75, 96];
 
 export const LEVELS: LevelConfig[] = [
   {
     name: "NORTH POLE PLAZA", 
     subtext: "A PERFECT CHRISTMAS EVE",
+    theme: 'CHRISTMAS_VILLAGE',
     colors: { 
-      sky: ['#0f172a', '#1e293b'], // Deep starry blue
-      ground: '#f8fafc', // Pristine Snow
-      mountains: '#334155', // Slate Mountains
-      city: '#475569', // Darker city silhouette
+      sky: ['#0f172a', '#1e293b'], 
+      ground: '#f1f5f9', 
+      mountains: '#334155', 
+      midground: '#475569', 
       fog: 'rgba(255, 255, 255, 0.05)', 
-      grid: '#334155',
-      aurora: ['#2dd4bf', '#0f766e'] // Teal/Green
+      grid: '#cbd5e1',
+      aurora: ['#2dd4bf', '#0f766e'] 
     },
     obstacleSpeed: 1.0,
-    spawnRate: 1.0,
+    spawnRate: 1.2,
     allowedObstacles: ['SNOWMAN', 'PRESENT_STACK', 'DECORATED_TREE'],
     musicTrack: 'WONDERLAND',
     glitchIntensity: 0.0
@@ -49,35 +50,37 @@ export const LEVELS: LevelConfig[] = [
   {
     name: "CANDY CANE LANE", 
     subtext: "SOMETHING FEELS... OFF",
+    theme: 'CANDY_FOREST',
     colors: { 
-      sky: ['#1e1b4b', '#312e81'], // Indigo Night
-      ground: '#e0f2fe', // Icy Blue
-      mountains: '#4338ca', // Indigo Mountains
-      city: '#3730a3', // Dark Indigo
+      sky: ['#1e1b4b', '#312e81'], 
+      ground: '#e0f2fe', 
+      mountains: '#4338ca', 
+      midground: '#3730a3', 
       fog: 'rgba(200, 230, 255, 0.1)',
-      grid: '#4f46e5',
-      aurora: ['#818cf8', '#4338ca'] // Purple/Indigo
+      grid: '#6366f1',
+      aurora: ['#818cf8', '#4338ca'] 
     },
     obstacleSpeed: 1.1,
-    spawnRate: 1.2,
+    spawnRate: 1.3,
     allowedObstacles: ['FESTIVE_ARCH', 'SNOWMAN', 'STATIC_CLOUD'],
     musicTrack: 'WONDERLAND',
     glitchIntensity: 0.1
   },
   {
-    name: "THE STUTTERING STORM", 
-    subtext: "TIME IS SKIPPING BEATS",
+    name: "SECTOR 7 INDUSTRIAL", 
+    subtext: "MACHINES RUNNING WILD",
+    theme: 'FACTORY_DISTRICT',
     colors: { 
-      sky: ['#111827', '#374151'], // Storm Dark
-      ground: '#cbd5e1', // Gray Snow
-      mountains: '#1f2937', // Dark Gray
-      city: '#374151', // Gray City
-      fog: 'rgba(255, 255, 255, 0.2)',
+      sky: ['#111827', '#374151'], 
+      ground: '#94a3b8', 
+      mountains: '#1f2937', 
+      midground: '#334155', 
+      fog: 'rgba(0, 0, 0, 0.2)',
       grid: '#fbbf24',
-      aurora: ['#fbbf24', '#b45309'] // Warning Gold
+      aurora: ['#fbbf24', '#b45309'] 
     },
     obstacleSpeed: 1.3,
-    spawnRate: 1.4,
+    spawnRate: 1.5,
     allowedObstacles: ['STATIC_CLOUD', 'CLOCKWORK_GEAR', 'GLITCH_ELF'],
     musicTrack: 'BLIZZARD',
     glitchIntensity: 0.3
@@ -85,14 +88,15 @@ export const LEVELS: LevelConfig[] = [
   {
     name: "FRACTURED REALITY", 
     subtext: "THE TIMELINE IS BREAKING",
+    theme: 'GLITCH_WASTELAND',
     colors: { 
-      sky: ['#0f0505', '#2b0a0a'], // Deep Void Red
+      sky: ['#2b0a0a', '#450a0a'], 
       ground: '#450a0a', 
       mountains: '#2a0a0a',
-      city: '#1a0505',
+      midground: '#7f1d1d',
       fog: 'rgba(153, 27, 27, 0.1)',
       grid: '#ef4444',
-      aurora: ['#ef4444', '#7f1d1d'] // Error Red
+      aurora: ['#ef4444', '#7f1d1d'] 
     },
     obstacleSpeed: 1.5,
     spawnRate: 1.8,
@@ -103,14 +107,15 @@ export const LEVELS: LevelConfig[] = [
   {
     name: "THE SINGULARITY", 
     subtext: "THE END OF CHRISTMAS",
+    theme: 'DIGITAL_VOID',
     colors: { 
-      sky: ['#000000', '#020617'], // Absolute Void
+      sky: ['#000000', '#020617'], 
       ground: '#000000', 
       mountains: '#000000',
-      city: '#020617',
-      fog: 'rgba(6, 182, 212, 0.05)',
+      midground: '#020617',
+      fog: 'rgba(6, 182, 212, 0.1)',
       grid: '#06b6d4',
-      aurora: ['#06b6d4', '#0891b2'] // Digital Cyan
+      aurora: ['#06b6d4', '#0891b2'] 
     },
     obstacleSpeed: 0, 
     spawnRate: 0,
